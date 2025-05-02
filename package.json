@@ -9,9 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "antd": "^5.24.9",
+    "googleapis": "^148.0.0",
+    "next": "14.2.3",
     "react": "^18",
-    "react-dom": "^18",
-    "next": "14.2.3"
+    "react-dom": "^18"
   },
   "devDependencies": {
     "eslint": "^8",
