@@ -8,7 +8,8 @@ import {
   CalendarOutlined, 
   BookOutlined, 
   BarChartOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  DollarOutlined
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -30,6 +31,7 @@ const items = [
   getItem('Rooms', '/rooms', <BankOutlined />),
   getItem('Availability', '/availability', <CalendarOutlined />),
   getItem('Bookings', '/bookings', <BookOutlined />),
+  getItem('Pricing', '/pricing', <DollarOutlined />),
   getItem('Reports', '/reports', <BarChartOutlined />),
 ];
 

@@ -179,7 +179,7 @@ export async function getPricesData() {
     
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'prices!A2:E',
+      range: 'prices!A2:G',
     });
     
     const rows = response.result.values || [];
@@ -190,7 +190,9 @@ export async function getPricesData() {
       roomId: row[1],
       startDate: row[2],
       endDate: row[3],
-      price: parseFloat(row[4]),
+      priceType: row.length > 4 ? row[4] : 'fixed', // 'fixed' or 'percentage'
+      priceValue: parseFloat(row[5]),
+      name: row.length > 6 ? row[6] : ''
     }));
   } catch (error) {
     console.error('Error fetching prices data:', error);
@@ -211,7 +213,7 @@ export async function getBookingsData() {
     
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'bookings!A2:H',
+      range: 'bookings!A2:M',
     });
     
     const rows = response.result.values || [];
@@ -226,6 +228,11 @@ export async function getBookingsData() {
       checkOut: row[5],
       totalPrice: parseFloat(row[6]),
       status: row[7],
+      basePrice: row.length > 8 ? parseFloat(row[8]) : null,
+      pricePerNight: row.length > 9 ? parseFloat(row[9]) : null,
+      nights: row.length > 10 ? parseInt(row[10]) : null,
+      selectedRuleIds: row.length > 11 ? (row[11] ? row[11].split(',') : []) : [],
+      notes: row.length > 12 ? row[12] : ''
     }));
   } catch (error) {
     console.error('Error fetching bookings data:', error);
@@ -342,118 +349,37 @@ export async function deleteRoom(roomId) {
 }
 
 /**
- * Add a new booking
+ * Calculate price with pricing rules
  */
-export async function addBooking(booking) {
-  try {
-    await initializeGoogleSheets();
+export function calculatePriceWithRules(basePrice, rules, selectedRuleIds = []) {
+  let finalPrice = basePrice;
+  
+  // Apply selected rules in order
+  if (selectedRuleIds && selectedRuleIds.length > 0) {
+    // Find all applicable rules in the selected order
+    const appliedRules = selectedRuleIds
+      .map(id => rules.find(rule => rule.id === id))
+      .filter(rule => rule !== undefined);
     
-    if (!gapi.client.getToken()) {
-      await authenticateUser();
-    }
-    
-    // Get existing bookings to determine next ID
-    const bookings = await getBookingsData();
-    const nextId = Math.max(...bookings.map(b => parseInt(b.id) || 0), 0) + 1;
-    
-    const values = [
-      [
-        nextId.toString(), 
-        booking.roomId, 
-        booking.guestName, 
-        booking.phone, 
-        booking.checkIn, 
-        booking.checkOut, 
-        booking.totalPrice.toString(), 
-        booking.status || 'active'
-      ]
-    ];
-    
-    await gapi.client.sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'bookings!A2:H',
-      valueInputOption: 'USER_ENTERED',
-      resource: { values },
-    });
-    
-    // Update room status to occupied
-    const rooms = await getRoomsData();
-    const room = rooms.find(r => r.id === booking.roomId);
-    
-    if (room) {
-      await updateRoom(room.id, { ...room, status: 'occupied' });
-    }
-    
-    return { ...booking, id: nextId.toString() };
-  } catch (error) {
-    console.error('Error adding booking:', error);
-    throw error;
-  }
-}
-
-/**
- * Update an existing booking
- */
-export async function updateBooking(bookingId, booking) {
-  try {
-    await initializeGoogleSheets();
-    
-    if (!gapi.client.getToken()) {
-      await authenticateUser();
-    }
-    
-    // Find the row with the given ID
-    const bookings = await getBookingsData();
-    const rowIndex = bookings.findIndex(b => b.id === bookingId);
-    
-    if (rowIndex === -1) {
-      throw new Error('Booking not found');
-    }
-    
-    // +2 because the first row is headers and array is 0-indexed
-    const row = rowIndex + 2;
-    
-    const values = [
-      [
-        bookingId, 
-        booking.roomId, 
-        booking.guestName, 
-        booking.phone, 
-        booking.checkIn, 
-        booking.checkOut, 
-        booking.totalPrice.toString(), 
-        booking.status
-      ]
-    ];
-    
-    await gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `bookings!A${row}:H${row}`,
-      valueInputOption: 'USER_ENTERED',
-      resource: { values },
-    });
-    
-    // If status changed to 'checked-out' or 'cancelled', update room status to 'empty'
-    if (booking.status === 'checked-out' || booking.status === 'cancelled') {
-      const rooms = await getRoomsData();
-      const room = rooms.find(r => r.id === booking.roomId);
-      
-      if (room) {
-        await updateRoom(room.id, { ...room, status: 'empty' });
+    // Apply each rule
+    for (const rule of appliedRules) {
+      if (rule.priceType === 'fixed') {
+        finalPrice = rule.priceValue;
+      } else if (rule.priceType === 'percentage') {
+        // For percentage, adjust the price by the percentage
+        // Positive percentage means increase, negative means discount
+        finalPrice = finalPrice * (1 + rule.priceValue / 100);
       }
     }
-    
-    return { ...booking, id: bookingId };
-  } catch (error) {
-    console.error('Error updating booking:', error);
-    throw error;
   }
+  
+  return finalPrice;
 }
 
 /**
  * Get available rooms for a date range
  */
-export async function getAvailableRooms(startDate, endDate, pax) {
+export async function getAvailableRooms(startDate, endDate, pax, selectedRuleIds = []) {
   try {
     await initializeGoogleSheets();
     
@@ -498,19 +424,22 @@ export async function getAvailableRooms(startDate, endDate, pax) {
       return !hasOverlap;
     });
     
-    // Get pricing for the period
+    // Get pricing rules
     const prices = await getPricesData();
     
     // Calculate total price for each room
     const roomsWithPricing = availableRooms.map(room => {
-      // Find custom pricing for this room during the requested period
-      const customPricing = prices.find(p => 
-        p.roomId === room.id && 
-        new Date(p.startDate) <= new Date(startDate) && 
-        new Date(p.endDate) >= new Date(endDate)
+      // Get base price from the room
+      const basePrice = parseFloat(room.basePrice);
+      
+      // Find any applicable pricing rules for this room and date range
+      const applicableRules = prices.filter(p => 
+        (p.roomId === room.id || p.roomId === 'all') && 
+        datesOverlap(p.startDate, p.endDate, startDate, endDate)
       );
       
-      const pricePerNight = customPricing ? parseFloat(customPricing.price) : parseFloat(room.basePrice);
+      // Calculate price per night using rules
+      const pricePerNight = calculatePriceWithRules(basePrice, applicableRules, selectedRuleIds);
       
       // Calculate number of nights
       const start = new Date(startDate);
@@ -519,15 +448,425 @@ export async function getAvailableRooms(startDate, endDate, pax) {
       
       return {
         ...room,
+        basePrice,
         pricePerNight,
         nights,
-        totalPrice: pricePerNight * nights
+        totalPrice: pricePerNight * nights,
+        applicableRules
       };
     });
     
     return roomsWithPricing;
   } catch (error) {
     console.error('Error fetching available rooms:', error);
+    throw error;
+  }
+}
+
+// Helper function to check if date ranges overlap
+function datesOverlap(ruleStart, ruleEnd, bookingStart, bookingEnd) {
+  // Convert strings to Date objects
+  const rStart = new Date(ruleStart);
+  const rEnd = new Date(ruleEnd);
+  const bStart = new Date(bookingStart);
+  const bEnd = new Date(bookingEnd);
+  
+  // Check for any overlap between the ranges
+  return (
+    // Rule starts during booking
+    (rStart >= bStart && rStart <= bEnd) ||
+    // Rule ends during booking
+    (rEnd >= bStart && rEnd <= bEnd) ||
+    // Rule surrounds booking
+    (rStart <= bStart && rEnd >= bEnd)
+  );
+}
+
+/**
+ * Add a new booking
+ */
+export async function addBooking(booking) {
+  try {
+    await initializeGoogleSheets();
+    
+    if (!gapi.client.getToken()) {
+      await authenticateUser();
+    }
+    
+    // Get existing bookings to determine next ID
+    const bookings = await getBookingsData();
+    const nextId = Math.max(...bookings.map(b => parseInt(b.id) || 0), 0) + 1;
+    
+    // Get rooms and pricing rules
+    const prices = await getPricesData();
+    const rooms = await getRoomsData();
+    const room = rooms.find(r => r.id === booking.roomId);
+    
+    // Get the base price from the room
+    const basePrice = room ? parseFloat(room.basePrice) : 0;
+    
+    // Find applicable pricing rules for this room and date range
+    const applicableRules = prices.filter(p => 
+      (p.roomId === booking.roomId || p.roomId === 'all') && 
+      datesOverlap(p.startDate, p.endDate, booking.checkIn, booking.checkOut)
+    );
+    
+    // Get selected rule IDs from the booking if available
+    const selectedRuleIds = booking.selectedRuleIds || [];
+    
+    // Calculate price per night using rules
+    const pricePerNight = calculatePriceWithRules(basePrice, applicableRules, selectedRuleIds);
+    
+    // Calculate number of nights
+    const checkIn = new Date(booking.checkIn);
+    const checkOut = new Date(booking.checkOut);
+    const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    
+    // Calculate total price
+    const totalPrice = pricePerNight * nights;
+    
+    // Expand spreadsheet headers if needed
+    try {
+      const headersResponse = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'bookings!A1:M1',
+      });
+      
+      const headers = headersResponse.result.values && headersResponse.result.values[0];
+      if (!headers || headers.length < 13) {
+        // Update headers to include the new fields
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: 'bookings!A1:M1',
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [['ID', 'Room ID', 'Guest Name', 'Phone', 'Check In', 'Check Out', 'Total Price', 'Status', 'Base Price', 'Price Per Night', 'Nights', 'Selected Rule IDs', 'Notes']]
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Error checking headers, will attempt to update them:', error);
+      // If error, try to update headers anyway
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'bookings!A1:M1',
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [['ID', 'Room ID', 'Guest Name', 'Phone', 'Check In', 'Check Out', 'Total Price', 'Status', 'Base Price', 'Price Per Night', 'Nights', 'Selected Rule IDs', 'Notes']]
+        }
+      });
+    }
+    
+    const values = [
+      [
+        nextId.toString(), 
+        booking.roomId, 
+        booking.guestName, 
+        booking.phone, 
+        booking.checkIn, 
+        booking.checkOut, 
+        totalPrice.toString(), 
+        booking.status || 'active',
+        basePrice.toString(),
+        pricePerNight.toString(),
+        nights.toString(),
+        selectedRuleIds.join(','),
+        booking.notes || ''
+      ]
+    ];
+    
+    await gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'bookings!A2:M',
+      valueInputOption: 'USER_ENTERED',
+      resource: { values },
+    });
+    
+    // Update room status to occupied
+    if (room) {
+      await updateRoom(room.id, { ...room, status: 'occupied' });
+    }
+    
+    return { 
+      ...booking, 
+      id: nextId.toString(),
+      totalPrice,
+      basePrice,
+      pricePerNight,
+      nights,
+      selectedRuleIds
+    };
+  } catch (error) {
+    console.error('Error adding booking:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing booking
+ */
+export async function updateBooking(bookingId, booking) {
+  try {
+    await initializeGoogleSheets();
+    
+    if (!gapi.client.getToken()) {
+      await authenticateUser();
+    }
+    
+    // Find the row with the given ID
+    const bookings = await getBookingsData();
+    const rowIndex = bookings.findIndex(b => b.id === bookingId);
+    
+    if (rowIndex === -1) {
+      throw new Error('Booking not found');
+    }
+    
+    // +2 because the first row is headers and array is 0-indexed
+    const row = rowIndex + 2;
+    
+    // If dates or room changed, check for price rule
+    let basePrice = booking.basePrice;
+    let pricePerNight = booking.pricePerNight;
+    let priceRuleApplied = booking.priceRuleApplied;
+    let priceRuleId = booking.priceRuleId;
+    let totalPrice = booking.totalPrice;
+    
+    // If a key booking parameter changed, recalculate prices
+    if (booking.checkIn !== bookings[rowIndex].checkIn || 
+        booking.checkOut !== bookings[rowIndex].checkOut || 
+        booking.roomId !== bookings[rowIndex].roomId) {
+      
+      // Check if any pricing rule applies to this booking
+      const prices = await getPricesData();
+      const rooms = await getRoomsData();
+      const room = rooms.find(r => r.id === booking.roomId);
+      
+      // Get the base price from the room
+      basePrice = room ? parseFloat(room.basePrice) : 0;
+      
+      // Find any applicable pricing rule
+      const priceRule = prices.find(p => 
+        (p.roomId === booking.roomId || p.roomId === 'all') && 
+        datesOverlap(p.startDate, p.endDate, booking.checkIn, booking.checkOut)
+      );
+      
+      // Calculate price per night (either from rule or base price)
+      pricePerNight = priceRule ? parseFloat(priceRule.price) : basePrice;
+      
+      // Calculate number of nights
+      const checkIn = new Date(booking.checkIn);
+      const checkOut = new Date(booking.checkOut);
+      const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+      
+      // Calculate total price
+      totalPrice = pricePerNight * nights;
+      
+      // Store whether a pricing rule was applied and its ID if applicable
+      priceRuleApplied = priceRule ? true : false;
+      priceRuleId = priceRule ? priceRule.id : '';
+    }
+    
+    const values = [
+      [
+        bookingId, 
+        booking.roomId, 
+        booking.guestName, 
+        booking.phone, 
+        booking.checkIn, 
+        booking.checkOut, 
+        totalPrice.toString(), 
+        booking.status,
+        basePrice.toString(),
+        pricePerNight.toString(),
+        priceRuleApplied.toString(),
+        priceRuleId
+      ]
+    ];
+    
+    await gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `bookings!A${row}:L${row}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values },
+    });
+    
+    // If status changed to 'checked-out' or 'cancelled', update room status to 'empty'
+    if (booking.status === 'checked-out' || booking.status === 'cancelled') {
+      const rooms = await getRoomsData();
+      const room = rooms.find(r => r.id === booking.roomId);
+      
+      if (room) {
+        await updateRoom(room.id, { ...room, status: 'empty' });
+      }
+    }
+    
+    return { 
+      ...booking, 
+      id: bookingId,
+      totalPrice,
+      basePrice,
+      pricePerNight,
+      priceRuleApplied,
+      priceRuleId
+    };
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    throw error;
+  }
+}
+
+/**
+ * Add a new price rule
+ */
+export async function addPriceRule(priceRule) {
+  try {
+    await initializeGoogleSheets();
+    
+    if (!gapi.client.getToken()) {
+      await authenticateUser();
+    }
+    
+    // Get existing price rules to determine next ID
+    const prices = await getPricesData();
+    const nextId = Math.max(...prices.map(p => parseInt(p.id) || 0), 0) + 1;
+    
+    // Expand spreadsheet headers if needed
+    try {
+      const headersResponse = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'prices!A1:G1',
+      });
+      
+      const headers = headersResponse.result.values && headersResponse.result.values[0];
+      if (!headers || headers.length < 7) {
+        // Update headers to include the new fields
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: 'prices!A1:G1',
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [['ID', 'Room ID', 'Start Date', 'End Date', 'Price Type', 'Price Value', 'Rule Name']]
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Error checking headers, will attempt to update them:', error);
+      // If error, try to update headers anyway
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'prices!A1:G1',
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [['ID', 'Room ID', 'Start Date', 'End Date', 'Price Type', 'Price Value', 'Rule Name']]
+        }
+      });
+    }
+    
+    const values = [
+      [
+        nextId.toString(), 
+        priceRule.roomId, 
+        priceRule.startDate, 
+        priceRule.endDate, 
+        priceRule.priceType || 'fixed', 
+        priceRule.priceValue.toString(),
+        priceRule.name || ''
+      ]
+    ];
+    
+    await gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'prices!A2:G',
+      valueInputOption: 'USER_ENTERED',
+      resource: { values },
+    });
+    
+    return { ...priceRule, id: nextId.toString() };
+  } catch (error) {
+    console.error('Error adding price rule:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing price rule
+ */
+export async function updatePriceRule(ruleId, priceRule) {
+  try {
+    await initializeGoogleSheets();
+    
+    if (!gapi.client.getToken()) {
+      await authenticateUser();
+    }
+    
+    // Find the row with the given ID
+    const prices = await getPricesData();
+    const rowIndex = prices.findIndex(p => p.id === ruleId);
+    
+    if (rowIndex === -1) {
+      throw new Error('Price rule not found');
+    }
+    
+    // +2 because the first row is headers and array is 0-indexed
+    const row = rowIndex + 2;
+    
+    const values = [
+      [
+        ruleId, 
+        priceRule.roomId, 
+        priceRule.startDate, 
+        priceRule.endDate, 
+        priceRule.priceType || 'fixed', 
+        priceRule.priceValue.toString(),
+        priceRule.name || ''
+      ]
+    ];
+    
+    await gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `prices!A${row}:G${row}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values },
+    });
+    
+    return { ...priceRule, id: ruleId };
+  } catch (error) {
+    console.error('Error updating price rule:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a price rule
+ */
+export async function deletePriceRule(ruleId) {
+  try {
+    await initializeGoogleSheets();
+    
+    if (!gapi.client.getToken()) {
+      await authenticateUser();
+    }
+    
+    // Find the row with the given ID
+    const prices = await getPricesData();
+    const rowIndex = prices.findIndex(p => p.id === ruleId);
+    
+    if (rowIndex === -1) {
+      throw new Error('Price rule not found');
+    }
+    
+    // +2 because the first row is headers and array is 0-indexed
+    const row = rowIndex + 2;
+    
+    // Clear the row by updating it with empty values
+    await gapi.client.sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `prices!A${row}:G${row}`,
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting price rule:', error);
     throw error;
   }
 } 
