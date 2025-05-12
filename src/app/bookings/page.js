@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  Table, 
-  Button, 
-  Space, 
-  Tag, 
-  Tabs, 
-  Drawer, 
-  Form, 
-  Input, 
-  DatePicker, 
-  Select, 
-  Spin, 
+import { useState, useEffect } from "react";
+import {
+  Table,
+  Button,
+  Space,
+  Tag,
+  Tabs,
+  Drawer,
+  Form,
+  Input,
+  DatePicker,
+  Select,
+  Spin,
   Alert,
   message,
   InputNumber,
@@ -21,31 +21,31 @@ import {
   Tooltip,
   Divider,
   Transfer,
-  Switch
-} from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  EyeOutlined, 
-  CheckOutlined, 
+  Switch,
+} from "antd";
+import {
+  PlusOutlined,
+  EditOutlined,
+  EyeOutlined,
+  CheckOutlined,
   CloseOutlined,
   InfoCircleOutlined,
-  PercentageOutlined
-} from '@ant-design/icons';
-import AppLayout from '@/components/AppLayout';
-import dayjs from 'dayjs';
-import { useSearchParams } from 'next/navigation';
-import { 
-  initializeGoogleSheets, 
+  PercentageOutlined,
+} from "@ant-design/icons";
+import AppLayout from "@/components/AppLayout";
+import dayjs from "dayjs";
+import { useSearchParams } from "next/navigation";
+import {
+  initializeGoogleSheets,
   authenticateUser,
-  getBookingsData, 
+  getBookingsData,
   getRoomsData,
   addBooking,
   updateBooking,
   getAvailableRooms,
   getPricesData,
-  calculatePriceWithRules
-} from '@/utils/googleSheets';
+  calculatePriceWithRules,
+} from "@/utils/googleSheets";
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -58,10 +58,10 @@ export default function BookingsPage() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [editingBooking, setEditingBooking] = useState(null);
   const [viewingBooking, setViewingBooking] = useState(null);
-  const [drawerTitle, setDrawerTitle] = useState('');
-  const [drawerType, setDrawerType] = useState('view'); // 'view', 'new', 'edit'
+  const [drawerTitle, setDrawerTitle] = useState("");
+  const [drawerType, setDrawerType] = useState("view"); // 'view', 'new', 'edit'
   const [form] = Form.useForm();
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState("active");
   const [isInitializing, setIsInitializing] = useState(true);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [selectedTotalPrice, setSelectedTotalPrice] = useState(0);
@@ -76,10 +76,10 @@ export default function BookingsPage() {
     totalPrice: 0,
     hasDiscount: false,
     hasPremium: false,
-    percentageChange: 0
+    percentageChange: 0,
   });
   const searchParams = useSearchParams();
-  
+
   useEffect(() => {
     const initializeAndFetch = async () => {
       try {
@@ -87,52 +87,52 @@ export default function BookingsPage() {
         await authenticateUser();
         setIsInitializing(false);
         await fetchData();
-        
+
         // Check if we need to open the new booking drawer
-        const action = searchParams.get('action');
-        const roomId = searchParams.get('roomId');
-        
-        if (action === 'new' && roomId) {
-          const room = rooms.find(r => r.id === roomId);
+        const action = searchParams.get("action");
+        const roomId = searchParams.get("roomId");
+
+        if (action === "new" && roomId) {
+          const room = rooms.find((r) => r.id === roomId);
           if (room) {
-            handleShowDrawer('new');
+            handleShowDrawer("new");
             form.setFieldsValue({ roomId });
           }
         }
       } catch (error) {
-        console.error('Error initializing Google Sheets API:', error);
-        setError('Failed to initialize Google Sheets API. Please try again.');
+        console.error("Error initializing Google Sheets API:", error);
+        setError("Failed to initialize Google Sheets API. Please try again.");
         setIsInitializing(false);
         setLoading(false);
       }
     };
-    
+
     initializeAndFetch();
   }, []);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch rooms and bookings data from Google Sheets
       const [roomsData, bookingsData] = await Promise.all([
         getRoomsData(),
-        getBookingsData()
+        getBookingsData(),
       ]);
-      
+
       // Add room number to bookings data
-      const enrichedBookings = bookingsData.map(booking => {
-        const room = roomsData.find(r => r.id === booking.roomId);
+      const enrichedBookings = bookingsData.map((booking) => {
+        const room = roomsData.find((r) => r.id === booking.roomId);
         return {
           ...booking,
-          roomNumber: room ? room.number : 'Unknown'
+          roomNumber: room ? room.number : "Unknown",
         };
       });
-      
+
       setRooms(roomsData);
       setBookings(enrichedBookings);
     } catch (err) {
-      setError('Failed to load bookings');
+      setError("Failed to load bookings");
       console.error(err);
     } finally {
       setLoading(false);
@@ -141,23 +141,23 @@ export default function BookingsPage() {
 
   const handleShowDrawer = (type, booking = null) => {
     setDrawerType(type);
-    
-    if (type === 'view') {
+
+    if (type === "view") {
       setViewingBooking(booking);
-      setDrawerTitle('Booking Details');
-    } else if (type === 'new') {
+      setDrawerTitle("Booking Details");
+    } else if (type === "new") {
       form.resetFields();
       setEditingBooking(null);
-      setDrawerTitle('Create New Booking');
-    } else if (type === 'edit') {
+      setDrawerTitle("Create New Booking");
+    } else if (type === "edit") {
       setEditingBooking(booking);
       form.setFieldsValue({
         ...booking,
         dateRange: [dayjs(booking.checkIn), dayjs(booking.checkOut)],
       });
-      setDrawerTitle('Edit Booking');
+      setDrawerTitle("Edit Booking");
     }
-    
+
     setDrawerVisible(true);
   };
 
@@ -169,59 +169,59 @@ export default function BookingsPage() {
     try {
       const values = await form.validateFields();
       const [checkIn, checkOut] = values.dateRange;
-      
+
       const bookingData = {
         ...values,
-        checkIn: checkIn.format('YYYY-MM-DD'),
-        checkOut: checkOut.format('YYYY-MM-DD'),
+        checkIn: checkIn.format("YYYY-MM-DD"),
+        checkOut: checkOut.format("YYYY-MM-DD"),
         totalPrice: selectedTotalPrice,
         selectedRuleIds: manualPriceRules ? targetSelectedRules : [],
-        notes: values.notes || ''
+        notes: values.notes || "",
       };
-      
+
       delete bookingData.dateRange;
-      
-      if (drawerType === 'edit' && editingBooking) {
+
+      if (drawerType === "edit" && editingBooking) {
         // Update existing booking
         await updateBooking(editingBooking.id, bookingData);
-        message.success('Booking updated successfully');
+        message.success("Booking updated successfully");
       } else {
         // Create new booking
         await addBooking(bookingData);
-        message.success('Booking created successfully');
+        message.success("Booking created successfully");
       }
-      
+
       setDrawerVisible(false);
       fetchData();
     } catch (err) {
-      console.error('Validation failed:', err);
+      console.error("Validation failed:", err);
     }
   };
 
   const handleCheckout = async (id) => {
     try {
-      const booking = bookings.find(b => b.id === id);
+      const booking = bookings.find((b) => b.id === id);
       if (booking) {
-        await updateBooking(id, { ...booking, status: 'checked-out' });
-        message.success('Guest checked out successfully');
+        await updateBooking(id, { ...booking, status: "checked-out" });
+        message.success("Guest checked out successfully");
         fetchData();
       }
     } catch (error) {
-      message.error('Failed to check out guest');
+      message.error("Failed to check out guest");
       console.error(error);
     }
   };
 
   const handleCancel = async (id) => {
     try {
-      const booking = bookings.find(b => b.id === id);
+      const booking = bookings.find((b) => b.id === id);
       if (booking) {
-        await updateBooking(id, { ...booking, status: 'cancelled' });
-        message.success('Booking cancelled successfully');
+        await updateBooking(id, { ...booking, status: "cancelled" });
+        message.success("Booking cancelled successfully");
         fetchData();
       }
     } catch (error) {
-      message.error('Failed to cancel booking');
+      message.error("Failed to cancel booking");
       console.error(error);
     }
   };
@@ -231,19 +231,19 @@ export default function BookingsPage() {
     if (!dates || dates.length !== 2) {
       setAvailableRooms([]);
       resetPriceDisplay();
-      
+
       // Reset room selection
       form.setFieldsValue({ roomId: undefined });
       return;
     }
-    
+
     const [checkIn, checkOut] = dates;
-    const guestCount = form.getFieldValue('guestCount') || 1;
-    
+    const guestCount = form.getFieldValue("guestCount") || 1;
+
     try {
       // Reset room selection first before fetching new data
       form.setFieldsValue({ roomId: undefined });
-      
+
       // Always reset price display when dates change
       setPriceDisplay({
         basePrice: 0,
@@ -252,242 +252,257 @@ export default function BookingsPage() {
         totalPrice: 0,
         hasDiscount: false,
         hasPremium: false,
-        percentageChange: 0
+        percentageChange: 0,
       });
-      
+
       // Show loading state
       setLoading(true);
-      
+
       // Fetch price rules that might apply to this period
       await fetchPriceRules();
-      
+
       // Pass empty array for selectedRuleIds to let the server apply all applicable rules
       const availableRoomsData = await getAvailableRooms(
-        checkIn.format('YYYY-MM-DD'),
-        checkOut.format('YYYY-MM-DD'),
+        checkIn.format("YYYY-MM-DD"),
+        checkOut.format("YYYY-MM-DD"),
         guestCount,
         []
       );
-      
+
       setAvailableRooms(availableRoomsData);
-      
+
       // If in manual mode, update the available rules based on the new dates
       if (manualPriceRules) {
-        const roomId = form.getFieldValue('roomId');
+        const roomId = form.getFieldValue("roomId");
         if (roomId) {
-          const startDate = checkIn.format('YYYY-MM-DD');
-          const endDate = checkOut.format('YYYY-MM-DD');
-          
+          const startDate = checkIn.format("YYYY-MM-DD");
+          const endDate = checkOut.format("YYYY-MM-DD");
+
           // Get rules for the new date range and selected room
           const allRules = await getPricesData();
-          const applicableRules = allRules.filter(rule => 
-            (rule.roomId === roomId || rule.roomId === 'all') && 
-            datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
+          const applicableRules = allRules.filter(
+            (rule) =>
+              (rule.roomId === roomId || rule.roomId === "all") &&
+              datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
           );
-          
+
           // Format applicable rules for the transfer component
-          const formattedRules = applicableRules.map(rule => ({
+          const formattedRules = applicableRules.map((rule) => ({
             key: rule.id,
             title: rule.name || `Rule ${rule.id}`,
-            description: formatRuleDescription(rule) + ` (${rule.startDate} to ${rule.endDate})`,
-            rule
+            description:
+              formatRuleDescription(rule) +
+              ` (${rule.startDate} to ${rule.endDate})`,
+            rule,
           }));
-          
-          console.log('Updated applicable rules for date change:', formattedRules);
+
+          console.log(
+            "Updated applicable rules for date change:",
+            formattedRules
+          );
           setAvailableRules(formattedRules);
-          
+
           // Clear selected rules that are no longer applicable
-          const newApplicableRuleIds = formattedRules.map(r => r.key);
-          const validSelectedRules = targetSelectedRules.filter(id => 
+          const newApplicableRuleIds = formattedRules.map((r) => r.key);
+          const validSelectedRules = targetSelectedRules.filter((id) =>
             newApplicableRuleIds.includes(id)
           );
-          
+
           if (validSelectedRules.length !== targetSelectedRules.length) {
-            message.info('Some selected pricing rules are no longer applicable for the new date range');
+            message.info(
+              "Some selected pricing rules are no longer applicable for the new date range"
+            );
             setTargetSelectedRules(validSelectedRules);
           }
         }
       }
-      
+
       // Reset the price info when dates change
       setSelectedTotalPrice(0);
       setSelectedPriceInfo(null);
       setTargetSelectedRules([]);
-      
+
       // If there's only one room available, auto-select it
       if (availableRoomsData.length === 1) {
         form.setFieldsValue({ roomId: availableRoomsData[0].id });
         handleRoomSelect(availableRoomsData[0].id);
       }
-      
     } catch (error) {
-      console.error('Error fetching available rooms:', error);
+      console.error("Error fetching available rooms:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuestCountChange = async (value) => {
-    const dateRange = form.getFieldValue('dateRange');
+    const dateRange = form.getFieldValue("dateRange");
     if (!dateRange || dateRange.length !== 2) return;
-    
+
     // Reset room selection first
     form.setFieldsValue({ roomId: undefined });
-    
+
     // Reset price display values
     resetPriceDisplay();
-    
+
     // Show loading state
     setLoading(true);
-    
+
     const [checkIn, checkOut] = dateRange;
-    
+
     try {
       const availableRoomsData = await getAvailableRooms(
-        checkIn.format('YYYY-MM-DD'),
-        checkOut.format('YYYY-MM-DD'),
+        checkIn.format("YYYY-MM-DD"),
+        checkOut.format("YYYY-MM-DD"),
         value
       );
-      
+
       setAvailableRooms(availableRoomsData);
-      
+
       // Reset the total price when available rooms change
       setSelectedTotalPrice(0);
       setSelectedPriceInfo(null);
-      
+
       // If there's only one room available, auto-select it
       if (availableRoomsData.length === 1) {
         form.setFieldsValue({ roomId: availableRoomsData[0].id });
         handleRoomSelect(availableRoomsData[0].id);
       }
-      
     } catch (error) {
-      console.error('Error fetching available rooms:', error);
+      console.error("Error fetching available rooms:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRoomSelect = async (roomId) => {
-    const room = availableRooms.find(r => r.id === roomId);
+    const room = availableRooms.find((r) => r.id === roomId);
     if (room) {
       // Get current values from form
-      const dateRange = form.getFieldValue('dateRange');
+      const dateRange = form.getFieldValue("dateRange");
       const [checkIn, checkOut] = dateRange || [];
-      
+
       // Immediately update price display with available data
       // This provides instant feedback while async operations complete
       const basePrice = parseFloat(room.basePrice) || 0;
       const pricePerNight = parseFloat(room.pricePerNight) || basePrice;
       const nights = room.nights || 1;
-      const totalPrice = parseFloat(room.totalPrice) || (pricePerNight * nights);
-      
+      const totalPrice = parseFloat(room.totalPrice) || pricePerNight * nights;
+
       // Update price display immediately
       updatePriceDisplay(basePrice, pricePerNight, nights);
       setSelectedTotalPrice(totalPrice);
-      
+
       if (checkIn && checkOut) {
-        const startDate = checkIn.format('YYYY-MM-DD');
-        const endDate = checkOut.format('YYYY-MM-DD');
-        
+        const startDate = checkIn.format("YYYY-MM-DD");
+        const endDate = checkOut.format("YYYY-MM-DD");
+
         try {
           // Get the applicable rules for this room and date range
           const allRules = await getPricesData();
-          const applicableRules = allRules.filter(rule => 
-            (rule.roomId === roomId || rule.roomId === 'all') && 
-            datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
+          const applicableRules = allRules.filter(
+            (rule) =>
+              (rule.roomId === roomId || rule.roomId === "all") &&
+              datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
           );
-          
-          console.log(`Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`);
-          
+
+          console.log(
+            `Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`
+          );
+
           // Format applicable rules for the transfer component
-          const formattedRules = applicableRules.map(rule => ({
+          const formattedRules = applicableRules.map((rule) => ({
             key: rule.id,
             title: rule.name || `Rule ${rule.id}`,
-            description: formatRuleDescription(rule) + ` (${rule.startDate} to ${rule.endDate})`,
-            rule
+            description:
+              formatRuleDescription(rule) +
+              ` (${rule.startDate} to ${rule.endDate})`,
+            rule,
           }));
-          
-          console.log('Applicable rules for this room:', formattedRules);
+
+          console.log("Applicable rules for this room:", formattedRules);
           setAvailableRules(formattedRules);
-          
+
           // If in manual mode, check if any previously selected rules are no longer applicable
           if (manualPriceRules && targetSelectedRules.length > 0) {
-            const newApplicableRuleIds = formattedRules.map(r => r.key);
-            const validSelectedRules = targetSelectedRules.filter(id => 
+            const newApplicableRuleIds = formattedRules.map((r) => r.key);
+            const validSelectedRules = targetSelectedRules.filter((id) =>
               newApplicableRuleIds.includes(id)
             );
-            
+
             if (validSelectedRules.length !== targetSelectedRules.length) {
-              message.info('Some selected pricing rules are no longer applicable for this room');
+              message.info(
+                "Some selected pricing rules are no longer applicable for this room"
+              );
               setTargetSelectedRules(validSelectedRules);
             }
           }
         } catch (error) {
-          console.error('Error updating room pricing:', error);
+          console.error("Error updating room pricing:", error);
         }
       } else {
         // If no dates selected, we can't determine applicable rules - show message if manual mode
         if (manualPriceRules) {
-          message.info('Please select dates to see applicable pricing rules');
+          message.info("Please select dates to see applicable pricing rules");
           setAvailableRules([]);
         }
-        
+
         // Reset selected rules when room changes
         setTargetSelectedRules([]);
       }
-      
+
       // Store information about the price
       setSelectedPriceInfo({
         basePrice: basePrice,
         appliedPrice: pricePerNight,
         isPriceRuleApplied: basePrice !== pricePerNight,
         nights: nights,
-        totalPrice: totalPrice
+        totalPrice: totalPrice,
       });
-      
-      console.log(`Selected room with price: ${totalPrice}, basePrice: ${basePrice}, pricePerNight: ${pricePerNight}, nights: ${nights}`);
+
+      console.log(
+        `Selected room with price: ${totalPrice}, basePrice: ${basePrice}, pricePerNight: ${pricePerNight}, nights: ${nights}`
+      );
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active':
-        return 'green';
-      case 'checked-out':
-        return 'blue';
-      case 'cancelled':
-        return 'red';
+      case "active":
+        return "green";
+      case "checked-out":
+        return "blue";
+      case "cancelled":
+        return "red";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const fetchPriceRules = async () => {
     try {
       const priceRules = await getPricesData();
-      
+
       // Format rules for the transfer component
-      const formattedRules = priceRules.map(rule => ({
+      const formattedRules = priceRules.map((rule) => ({
         key: rule.id,
         title: rule.name || `Rule ${rule.id}`,
         description: formatRuleDescription(rule),
         rule,
-        disabled: false // Make sure rules aren't disabled by default
+        disabled: false, // Make sure rules aren't disabled by default
       }));
-      
-      console.log('Available price rules:', formattedRules);
+
+      console.log("Available price rules:", formattedRules);
       setAvailableRules(formattedRules);
     } catch (error) {
-      console.error('Error fetching price rules:', error);
+      console.error("Error fetching price rules:", error);
     }
   };
-  
+
   const formatRuleDescription = (rule) => {
-    if (rule.priceType === 'fixed') {
+    if (rule.priceType === "fixed") {
       return `Fixed: $${rule.priceValue}`;
     } else {
-      const prefix = rule.priceValue > 0 ? '+' : '';
+      const prefix = rule.priceValue > 0 ? "+" : "";
       return `${prefix}${rule.priceValue}%`;
     }
   };
@@ -497,13 +512,15 @@ export default function BookingsPage() {
     basePrice = parseFloat(basePrice) || 0;
     finalPrice = parseFloat(finalPrice) || 0;
     nights = parseInt(nights) || 1;
-    
+
     const totalPrice = finalPrice * nights;
     const difference = finalPrice - basePrice;
     const percentageChange = basePrice > 0 ? (difference / basePrice) * 100 : 0;
-    
-    console.log(`Updating price display: basePrice=${basePrice}, finalPrice=${finalPrice}, nights=${nights}, totalPrice=${totalPrice}`);
-    
+
+    console.log(
+      `Updating price display: basePrice=${basePrice}, finalPrice=${finalPrice}, nights=${nights}, totalPrice=${totalPrice}`
+    );
+
     setPriceDisplay({
       basePrice,
       finalPrice,
@@ -511,52 +528,58 @@ export default function BookingsPage() {
       totalPrice,
       hasDiscount: finalPrice < basePrice,
       hasPremium: finalPrice > basePrice,
-      percentageChange: Math.abs(percentageChange)
+      percentageChange: Math.abs(percentageChange),
     });
   };
 
   const handleRuleSelectionChange = (targetKeys) => {
-    console.log('Selected rules changed:', targetKeys);
+    console.log("Selected rules changed:", targetKeys);
     setTargetSelectedRules(targetKeys);
-    
+
     // Recalculate price based on selected rules
-    const selectedRoom = availableRooms.find(r => r.id === form.getFieldValue('roomId'));
+    const selectedRoom = availableRooms.find(
+      (r) => r.id === form.getFieldValue("roomId")
+    );
     if (selectedRoom) {
       const basePrice = parseFloat(selectedRoom.basePrice) || 0;
       const nights = parseInt(selectedRoom.nights) || 5;
-      
+
       // Get full rule objects for the selected IDs
       const selectedRules = availableRules
-        .filter(rule => targetKeys.includes(rule.key))
-        .map(item => item.rule);
-      
-      console.log('Selected rule objects:', selectedRules);
-      
+        .filter((rule) => targetKeys.includes(rule.key))
+        .map((item) => item.rule);
+
+      console.log("Selected rule objects:", selectedRules);
+
       // Calculate the new price with selected rules
-      const newPrice = calculatePriceWithRules(basePrice, selectedRules, targetKeys);
+      const newPrice = calculatePriceWithRules(
+        basePrice,
+        selectedRules,
+        targetKeys
+      );
       console.log(`New calculated price: ${newPrice} (base: ${basePrice})`);
-      
+
       // Update the price display
       updatePriceDisplay(basePrice, newPrice, nights);
-      
+
       // Update total price
       const totalPrice = newPrice * nights;
       setSelectedTotalPrice(totalPrice);
-      
+
       // Update price info
       setSelectedPriceInfo({
         basePrice,
         appliedPrice: newPrice,
         isPriceRuleApplied: basePrice !== newPrice,
         nights,
-        totalPrice
+        totalPrice,
       });
     }
   };
 
   // Add this to make sure pricing rules are loaded when the drawer opens
   useEffect(() => {
-    if (drawerVisible && (drawerType === 'new' || drawerType === 'edit')) {
+    if (drawerVisible && (drawerType === "new" || drawerType === "edit")) {
       fetchPriceRules();
     }
   }, [drawerVisible, drawerType]);
@@ -568,7 +591,7 @@ export default function BookingsPage() {
     const rEnd = new Date(ruleEnd);
     const bStart = new Date(bookingStart);
     const bEnd = new Date(bookingEnd);
-    
+
     // Check for any overlap between the ranges
     return (
       // Rule starts during booking
@@ -582,82 +605,82 @@ export default function BookingsPage() {
 
   const columns = [
     {
-      title: 'Room',
-      dataIndex: 'roomNumber',
-      key: 'roomNumber',
+      title: "Room",
+      dataIndex: "roomNumber",
+      key: "roomNumber",
       sorter: (a, b) => a.roomNumber.localeCompare(b.roomNumber),
     },
     {
-      title: 'Guest Name',
-      dataIndex: 'guestName',
-      key: 'guestName',
+      title: "Guest Name",
+      dataIndex: "guestName",
+      key: "guestName",
       sorter: (a, b) => a.guestName.localeCompare(b.guestName),
     },
     {
-      title: 'Check-in',
-      dataIndex: 'checkIn',
-      key: 'checkIn',
+      title: "Check-in",
+      dataIndex: "checkIn",
+      key: "checkIn",
       sorter: (a, b) => dayjs(a.checkIn).unix() - dayjs(b.checkIn).unix(),
     },
     {
-      title: 'Check-out',
-      dataIndex: 'checkOut',
-      key: 'checkOut',
+      title: "Check-out",
+      dataIndex: "checkOut",
+      key: "checkOut",
       sorter: (a, b) => dayjs(a.checkOut).unix() - dayjs(b.checkOut).unix(),
     },
     {
-      title: 'Total Price',
-      dataIndex: 'totalPrice',
-      key: 'totalPrice',
+      title: "Total Price",
+      dataIndex: "totalPrice",
+      key: "totalPrice",
       render: (price) => `$${price}`,
       sorter: (a, b) => a.totalPrice - b.totalPrice,
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
       filters: [
-        { text: 'Active', value: 'active' },
-        { text: 'Checked-out', value: 'checked-out' },
-        { text: 'Cancelled', value: 'cancelled' },
+        { text: "Active", value: "active" },
+        { text: "Checked-out", value: "checked-out" },
+        { text: "Cancelled", value: "cancelled" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (
         <Tag color={getStatusColor(status)}>
-          {status.toUpperCase().replace(/-/g, ' ')}
+          {status.toUpperCase().replace(/-/g, " ")}
         </Tag>
       ),
     },
     {
-      title: 'Actions',
-      key: 'actions',
+      title: "Actions",
+      key: "actions",
       render: (_, record) => {
         const actions = [
-          <Button 
-            key="view" 
-            icon={<EyeOutlined />} 
-            onClick={() => handleShowDrawer('view', record)}
+          <Button
+            key="view"
+            icon={<EyeOutlined />}
+            onClick={() => handleShowDrawer("view", record)}
             size="small"
           />,
         ];
-        
-        if (record.status === 'active') {
+
+        if (record.status === "active") {
           actions.push(
-            <Button 
-              key="edit" 
-              icon={<EditOutlined />} 
-              onClick={() => handleShowDrawer('edit', record)}
+            <Button
+              key="edit"
+              icon={<EditOutlined />}
+              onClick={() => handleShowDrawer("edit", record)}
               size="small"
             />,
-            <Button 
-              key="checkout" 
+            <Button
+              key="checkout"
               icon={<CheckOutlined />}
               onClick={() => handleCheckout(record.id)}
               size="small"
-              style={{ backgroundColor: '#52c41a', color: 'white' }}
+              style={{ backgroundColor: "#52c41a", color: "white" }}
             />,
-            <Button 
-              key="cancel" 
+            <Button
+              key="cancel"
               icon={<CloseOutlined />}
               danger
               onClick={() => handleCancel(record.id)}
@@ -665,170 +688,214 @@ export default function BookingsPage() {
             />
           );
         }
-        
+
         return <Space size="small">{actions}</Space>;
       },
     },
   ];
 
   const renderDrawerContent = () => {
-    if (drawerType === 'view' && viewingBooking) {
+    if (drawerType === "view" && viewingBooking) {
       return (
-        <Descriptions 
-          bordered 
+        <Descriptions
+          bordered
           column={1}
           title={`Booking #${viewingBooking.id}`}
         >
           <Descriptions.Item label="Status">
-            <Badge 
-              status={getStatusColor(viewingBooking.status) === 'green' ? 'success' : 
-                     getStatusColor(viewingBooking.status) === 'blue' ? 'processing' : 'error'} 
-              text={viewingBooking.status.toUpperCase().replace(/-/g, ' ')} 
+            <Badge
+              status={
+                getStatusColor(viewingBooking.status) === "green"
+                  ? "success"
+                  : getStatusColor(viewingBooking.status) === "blue"
+                  ? "processing"
+                  : "error"
+              }
+              text={viewingBooking.status.toUpperCase().replace(/-/g, " ")}
             />
           </Descriptions.Item>
-          <Descriptions.Item label="Room Number">{viewingBooking.roomNumber}</Descriptions.Item>
-          <Descriptions.Item label="Guest Name">{viewingBooking.guestName}</Descriptions.Item>
-          <Descriptions.Item label="Phone Number">{viewingBooking.phone}</Descriptions.Item>
-          <Descriptions.Item label="Check-in Date">{viewingBooking.checkIn}</Descriptions.Item>
-          <Descriptions.Item label="Check-out Date">{viewingBooking.checkOut}</Descriptions.Item>
-          <Descriptions.Item label="Total Price">${viewingBooking.totalPrice}</Descriptions.Item>
-          
+          <Descriptions.Item label="Room Number">
+            {viewingBooking.roomNumber}
+          </Descriptions.Item>
+          <Descriptions.Item label="Guest Name">
+            {viewingBooking.guestName}
+          </Descriptions.Item>
+          <Descriptions.Item label="Phone Number">
+            {viewingBooking.phone}
+          </Descriptions.Item>
+          <Descriptions.Item label="Check-in Date">
+            {viewingBooking.checkIn}
+          </Descriptions.Item>
+          <Descriptions.Item label="Check-out Date">
+            {viewingBooking.checkOut}
+          </Descriptions.Item>
+          <Descriptions.Item label="Total Price">
+            ${viewingBooking.totalPrice}
+          </Descriptions.Item>
+
           {viewingBooking.pricePerNight && viewingBooking.basePrice && (
             <>
-              <Descriptions.Item label="Base Price">${viewingBooking.basePrice}/night</Descriptions.Item>
+              <Descriptions.Item label="Base Price">
+                ${viewingBooking.basePrice}/night
+              </Descriptions.Item>
               <Descriptions.Item label="Applied Price Per Night">
                 <Space>
                   ${viewingBooking.pricePerNight}/night
-                  {viewingBooking.pricePerNight !== viewingBooking.basePrice && (
-                    <Tag color={viewingBooking.pricePerNight > viewingBooking.basePrice ? 'red' : 'green'}>
-                      {viewingBooking.pricePerNight > viewingBooking.basePrice ? 'Premium' : 'Discount'} Rate
+                  {viewingBooking.pricePerNight !==
+                    viewingBooking.basePrice && (
+                    <Tag
+                      color={
+                        viewingBooking.pricePerNight > viewingBooking.basePrice
+                          ? "red"
+                          : "green"
+                      }
+                    >
+                      {viewingBooking.pricePerNight > viewingBooking.basePrice
+                        ? "Premium"
+                        : "Discount"}{" "}
+                      Rate
                     </Tag>
                   )}
                 </Space>
               </Descriptions.Item>
             </>
           )}
-          
-          {viewingBooking.selectedRuleIds && viewingBooking.selectedRuleIds.length > 0 && (
-            <Descriptions.Item label="Applied Price Rules">
-              <ul style={{ margin: 0, paddingLeft: 16 }}>
-                {viewingBooking.selectedRuleIds.split(',').map(ruleId => {
-                  const rule = availableRules.find(r => r.key === ruleId);
-                  return (
-                    <li key={ruleId}>
-                      {rule ? rule.title : `Rule ID: ${ruleId}`}
-                    </li>
-                  );
-                })}
-              </ul>
-            </Descriptions.Item>
-          )}
-          
+
+          {viewingBooking.selectedRuleIds &&
+            viewingBooking.selectedRuleIds.length > 0 && (
+              <Descriptions.Item label="Applied Price Rules">
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {viewingBooking.selectedRuleIds.split(",").map((ruleId) => {
+                    const rule = availableRules.find((r) => r.key === ruleId);
+                    return (
+                      <li key={ruleId}>
+                        {rule ? rule.title : `Rule ID: ${ruleId}`}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Descriptions.Item>
+            )}
+
           {viewingBooking.notes && (
-            <Descriptions.Item label="Notes">{viewingBooking.notes}</Descriptions.Item>
+            <Descriptions.Item label="Notes">
+              {viewingBooking.notes}
+            </Descriptions.Item>
           )}
         </Descriptions>
       );
     }
-    
+
     const disabledDate = (current) => {
       // Can't select days before today
-      return current && current < dayjs().startOf('day');
+      return current && current < dayjs().startOf("day");
     };
-    
+
     return (
-      <Form
-        form={form}
-        layout="vertical"
-      >
+      <Form form={form} layout="vertical">
         <Form.Item
           name="guestName"
           label="Guest Name"
-          rules={[{ required: true, message: 'Please enter guest name' }]}
+          rules={[{ required: true, message: "Please enter guest name" }]}
         >
           <Input placeholder="Enter guest name" />
         </Form.Item>
-        
+
         <Form.Item
           name="phone"
           label="Phone Number"
-          rules={[{ required: true, message: 'Please enter phone number' }]}
+          rules={[{ required: true, message: "Please enter phone number" }]}
         >
           <Input placeholder="Enter phone number" />
         </Form.Item>
-        
+
         <Form.Item
           name="dateRange"
           label="Check-in & Check-out Dates"
-          rules={[{ required: true, message: 'Please select date range' }]}
+          rules={[{ required: true, message: "Please select date range" }]}
         >
-          <RangePicker 
-            style={{ width: '100%' }} 
+          <RangePicker
+            style={{ width: "100%" }}
             disabledDate={disabledDate}
             format="YYYY-MM-DD"
-            onChange={drawerType === 'edit' ? (dates) => {
-              // When editing and dates change, refresh price information
-              if (dates && dates.length === 2) {
-                // Get current form values
-                const currentValues = form.getFieldsValue();
-                const roomId = currentValues.roomId;
-                const [checkIn, checkOut] = dates;
-                
-                const fetchUpdatedPrice = async () => {
-                  try {
-                    // Get rooms with pricing for these dates
-                    await fetchPriceRules();
-                    
-                    const availableRoomsData = await getAvailableRooms(
-                      checkIn.format('YYYY-MM-DD'),
-                      checkOut.format('YYYY-MM-DD'),
-                      1 // Just need pricing info, not actual availability
-                    );
-                    
-                    // Find the selected room
-                    const roomWithPrice = availableRoomsData.find(r => r.id === roomId);
-                    if (roomWithPrice) {
-                      // Update total price
-                      setSelectedTotalPrice(roomWithPrice.totalPrice);
-                      
-                      // Store information about the price
-                      const basePrice = roomWithPrice.basePrice;
-                      const appliedPrice = roomWithPrice.pricePerNight;
-                      const isPriceRuleApplied = basePrice !== appliedPrice;
-                      
-                      setSelectedPriceInfo({
-                        basePrice,
-                        appliedPrice,
-                        isPriceRuleApplied,
-                        nights: roomWithPrice.nights,
-                        totalPrice: roomWithPrice.totalPrice
-                      });
-                      
-                      // Update the price display
-                      updatePriceDisplay(basePrice, appliedPrice, roomWithPrice.nights);
-                      
-                      message.info('Price updated based on selected dates');
+            onChange={
+              drawerType === "edit"
+                ? (dates) => {
+                    // When editing and dates change, refresh price information
+                    if (dates && dates.length === 2) {
+                      // Get current form values
+                      const currentValues = form.getFieldsValue();
+                      const roomId = currentValues.roomId;
+                      const [checkIn, checkOut] = dates;
+
+                      const fetchUpdatedPrice = async () => {
+                        try {
+                          // Get rooms with pricing for these dates
+                          await fetchPriceRules();
+
+                          const availableRoomsData = await getAvailableRooms(
+                            checkIn.format("YYYY-MM-DD"),
+                            checkOut.format("YYYY-MM-DD"),
+                            1 // Just need pricing info, not actual availability
+                          );
+
+                          // Find the selected room
+                          const roomWithPrice = availableRoomsData.find(
+                            (r) => r.id === roomId
+                          );
+                          if (roomWithPrice) {
+                            // Update total price
+                            setSelectedTotalPrice(roomWithPrice.totalPrice);
+
+                            // Store information about the price
+                            const basePrice = roomWithPrice.basePrice;
+                            const appliedPrice = roomWithPrice.pricePerNight;
+                            const isPriceRuleApplied =
+                              basePrice !== appliedPrice;
+
+                            setSelectedPriceInfo({
+                              basePrice,
+                              appliedPrice,
+                              isPriceRuleApplied,
+                              nights: roomWithPrice.nights,
+                              totalPrice: roomWithPrice.totalPrice,
+                            });
+
+                            // Update the price display
+                            updatePriceDisplay(
+                              basePrice,
+                              appliedPrice,
+                              roomWithPrice.nights
+                            );
+
+                            message.info(
+                              "Price updated based on selected dates"
+                            );
+                          }
+                        } catch (error) {
+                          console.error("Error updating price:", error);
+                        }
+                      };
+
+                      fetchUpdatedPrice();
                     }
-                  } catch (error) {
-                    console.error('Error updating price:', error);
                   }
-                };
-                
-                fetchUpdatedPrice();
-              }
-            } : handleDateRangeChange}
+                : handleDateRangeChange
+            }
           />
         </Form.Item>
-        
+
         <Form.Item
           name="guestCount"
           label="Number of Guests"
-          rules={[{ required: true, message: 'Please select number of guests' }]}
+          rules={[
+            { required: true, message: "Please select number of guests" },
+          ]}
           initialValue={1}
         >
           <Select
-            style={{ width: '100%' }}
-            onChange={drawerType === 'new' ? handleGuestCountChange : undefined}
+            style={{ width: "100%" }}
+            onChange={drawerType === "new" ? handleGuestCountChange : undefined}
           >
             <Option value={1}>1 Guest</Option>
             <Option value={2}>2 Guests</Option>
@@ -836,35 +903,52 @@ export default function BookingsPage() {
             <Option value={4}>4 Guests</Option>
           </Select>
         </Form.Item>
-        
+
         <Form.Item
           name="roomId"
           label="Room"
-          rules={[{ required: true, message: 'Please select a room' }]}
+          rules={[{ required: true, message: "Please select a room" }]}
         >
-          <Select 
-            placeholder="Select a room" 
+          <Select
+            placeholder="Select a room"
             onChange={handleRoomSelect}
             disabled={availableRooms.length === 0}
           >
-            {availableRooms.map(room => {
+            {availableRooms.map((room) => {
               // Make sure we have numeric values for display
               const basePrice = parseFloat(room.basePrice) || 0;
               const pricePerNight = parseFloat(room.pricePerNight) || basePrice;
               const nights = room.nights || 5; // Default to 5 nights if not available
-              const totalPrice = parseFloat(room.totalPrice) || (pricePerNight * nights);
-              
+              const totalPrice =
+                parseFloat(room.totalPrice) || pricePerNight * nights;
+
               const isSpecialPrice = pricePerNight !== basePrice;
-              
+
               return (
                 <Option key={room.id} value={room.id}>
-                  Room {room.number} ({room.type}) - 
+                  Room {room.number} ({room.type}) -
                   {isSpecialPrice ? (
                     <span>
-                      <span style={{ textDecoration: 'line-through', marginRight: 5 }}>${basePrice}</span>
-                      <span style={{ color: isSpecialPrice ? (pricePerNight > basePrice ? '#ff4d4f' : '#52c41a') : 'inherit' }}>
+                      <span
+                        style={{
+                          textDecoration: "line-through",
+                          marginRight: 5,
+                        }}
+                      >
+                        ${basePrice}
+                      </span>
+                      <span
+                        style={{
+                          color: isSpecialPrice
+                            ? pricePerNight > basePrice
+                              ? "#ff4d4f"
+                              : "#52c41a"
+                            : "inherit",
+                        }}
+                      >
                         ${pricePerNight}
-                      </span>/night
+                      </span>
+                      /night
                     </span>
                   ) : (
                     <span>${pricePerNight}/night</span>
@@ -875,82 +959,142 @@ export default function BookingsPage() {
             })}
           </Select>
         </Form.Item>
-        
+
         <div style={{ marginBottom: 24 }}>
-          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-            <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+          <div
+            style={{ marginBottom: 8, display: "flex", alignItems: "center" }}
+          >
+            <span style={{ color: "#ff4d4f", marginRight: 4 }}>*</span>
             <span>Price Calculation</span>
-            {selectedPriceInfo && selectedPriceInfo.isPriceRuleApplied && !manualPriceRules && (
-              <Tooltip title={`Special pricing applied: $${selectedPriceInfo.appliedPrice}/night instead of standard $${selectedPriceInfo.basePrice}/night`}>
-                <InfoCircleOutlined style={{ marginLeft: 5, color: '#1890ff' }} />
-              </Tooltip>
-            )}
+            {selectedPriceInfo &&
+              selectedPriceInfo.isPriceRuleApplied &&
+              !manualPriceRules && (
+                <Tooltip
+                  title={`Special pricing applied: $${selectedPriceInfo.appliedPrice}/night instead of standard $${selectedPriceInfo.basePrice}/night`}
+                >
+                  <InfoCircleOutlined
+                    style={{ marginLeft: 5, color: "#1890ff" }}
+                  />
+                </Tooltip>
+              )}
           </div>
-          
-          <div 
-            style={{ 
-              padding: '16px',
-              border: '1px solid #d9d9d9',
-              borderRadius: '2px',
-              backgroundColor: '#f5f5f5',
-              marginBottom: '16px'
+
+          <div
+            style={{
+              padding: "16px",
+              border: "1px solid #d9d9d9",
+              borderRadius: "2px",
+              backgroundColor: "#f5f5f5",
+              marginBottom: "16px",
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
               <div>Base Price:</div>
               <div>${priceDisplay.basePrice.toFixed(2)}/night</div>
             </div>
-            
+
             {(priceDisplay.hasDiscount || priceDisplay.hasPremium) && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div>
-                  {priceDisplay.hasDiscount ? 'Discount:' : 'Premium:'}
-                </div>
-                <div style={{ color: priceDisplay.hasDiscount ? '#52c41a' : '#ff4d4f' }}>
-                  {priceDisplay.hasDiscount ? '-' : '+'}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
+                <div>{priceDisplay.hasDiscount ? "Discount:" : "Premium:"}</div>
+                <div
+                  style={{
+                    color: priceDisplay.hasDiscount ? "#52c41a" : "#ff4d4f",
+                  }}
+                >
+                  {priceDisplay.hasDiscount ? "-" : "+"}
                   {priceDisplay.percentageChange.toFixed(2)}%
                 </div>
               </div>
             )}
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
               <div>Final Price:</div>
-              <div style={{ 
-                fontWeight: 'bold', 
-                color: priceDisplay.hasDiscount ? '#52c41a' : (priceDisplay.hasPremium ? '#ff4d4f' : 'inherit')
-              }}>
+              <div
+                style={{
+                  fontWeight: "bold",
+                  color: priceDisplay.hasDiscount
+                    ? "#52c41a"
+                    : priceDisplay.hasPremium
+                    ? "#ff4d4f"
+                    : "inherit",
+                }}
+              >
                 ${priceDisplay.finalPrice.toFixed(2)}/night
               </div>
             </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
               <div>Nights:</div>
               <div>{priceDisplay.nights}</div>
             </div>
-            
-            <Divider style={{ margin: '8px 0' }} />
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '16px', fontWeight: 'bold' }}>
+
+            <Divider style={{ margin: "8px 0" }} />
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontSize: "16px",
+                fontWeight: "bold",
+              }}
+            >
               <div>Total Price:</div>
               <div>${priceDisplay.totalPrice.toFixed(2)}</div>
             </div>
           </div>
-          
+
           <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontWeight: 'bold' }}>
-              <span>Manually Select Pricing Rules</span>
-              <Switch 
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+                fontWeight: "bold",
+              }}
+            >
+              <span>Select Pricing Rules</span>
+              <Switch
                 checked={manualPriceRules}
                 onChange={(checked) => {
-                  console.log('Manual price rules toggled:', checked);
+                  console.log("Manual price rules toggled:", checked);
                   setManualPriceRules(checked);
-                  
+
                   // Reset selected rules
                   setTargetSelectedRules([]);
-                  
+
                   if (!checked) {
                     // Reset to automatic pricing
-                    const roomId = form.getFieldValue('roomId');
+                    const roomId = form.getFieldValue("roomId");
                     if (roomId) {
                       // Re-select the current room to recalculate prices
                       handleRoomSelect(roomId);
@@ -960,46 +1104,67 @@ export default function BookingsPage() {
                     }
                   } else {
                     // When enabling manual mode, fetch applicable rules
-                    const dateRange = form.getFieldValue('dateRange');
-                    const roomId = form.getFieldValue('roomId');
-                    
+                    const dateRange = form.getFieldValue("dateRange");
+                    const roomId = form.getFieldValue("roomId");
+
                     if (dateRange && dateRange.length === 2 && roomId) {
                       const [checkIn, checkOut] = dateRange;
-                      const startDate = checkIn.format('YYYY-MM-DD');
-                      const endDate = checkOut.format('YYYY-MM-DD');
-                      
+                      const startDate = checkIn.format("YYYY-MM-DD");
+                      const endDate = checkOut.format("YYYY-MM-DD");
+
                       // Get rules for the selected date range and room
                       const fetchApplicableRules = async () => {
                         try {
                           const allRules = await getPricesData();
-                          const applicableRules = allRules.filter(rule => 
-                            (rule.roomId === roomId || rule.roomId === 'all') && 
-                            datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
+                          const applicableRules = allRules.filter(
+                            (rule) =>
+                              (rule.roomId === roomId ||
+                                rule.roomId === "all") &&
+                              datesOverlap(
+                                rule.startDate,
+                                rule.endDate,
+                                startDate,
+                                endDate
+                              )
                           );
-                          
-                          console.log(`Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`);
-                          
+
+                          console.log(
+                            `Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`
+                          );
+
                           // Format applicable rules for the transfer component
-                          const formattedRules = applicableRules.map(rule => ({
-                            key: rule.id,
-                            title: rule.name || `Rule ${rule.id}`,
-                            description: formatRuleDescription(rule) + ` (${rule.startDate} to ${rule.endDate})`,
-                            rule
-                          }));
-                          
-                          console.log('Applicable rules for manual selection:', formattedRules);
+                          const formattedRules = applicableRules.map(
+                            (rule) => ({
+                              key: rule.id,
+                              title: rule.name || `Rule ${rule.id}`,
+                              description:
+                                formatRuleDescription(rule) +
+                                ` (${rule.startDate} to ${rule.endDate})`,
+                              rule,
+                            })
+                          );
+
+                          console.log(
+                            "Applicable rules for manual selection:",
+                            formattedRules
+                          );
                           setAvailableRules(formattedRules);
                         } catch (error) {
-                          console.error('Error fetching applicable rules:', error);
+                          console.error(
+                            "Error fetching applicable rules:",
+                            error
+                          );
                         }
                       };
-                      
+
                       fetchApplicableRules();
                     } else {
                       // If no dates or room selected yet, just notify the user and reset prices
-                      message.info('Please select dates and a room to see applicable pricing rules');
+                      message.info(
+                        "Please select dates and a room to see applicable pricing rules"
+                      );
                       setAvailableRules([]);
-                      
+
                       // Only reset prices if a room isn't selected (to avoid overwriting valid prices)
                       if (!roomId) {
                         resetPriceDisplay();
@@ -1011,16 +1176,19 @@ export default function BookingsPage() {
             </div>
             {manualPriceRules && (
               <div>
-                <div style={{ marginBottom: 8, fontSize: 12, color: '#1890ff' }}>
-                  Select pricing rules from the left side to apply them to this booking
+                <div
+                  style={{ marginBottom: 8, fontSize: 12, color: "#1890ff" }}
+                >
+                  Select pricing rules from the left side to apply them to this
+                  booking
                 </div>
                 {availableRules.length > 0 ? (
                   <Transfer
                     dataSource={availableRules}
-                    titles={['Available Rules', 'Applied Rules']}
+                    titles={["Available Rules", "Applied Rules"]}
                     targetKeys={targetSelectedRules}
                     onChange={handleRuleSelectionChange}
-                    render={item => (
+                    render={(item) => (
                       <div>
                         <span>{item.title}</span>
                         <br />
@@ -1031,40 +1199,48 @@ export default function BookingsPage() {
                       width: 200,
                       height: 300,
                     }}
-                    operations={['Apply', 'Remove']}
+                    operations={["Apply", "Remove"]}
                   />
                 ) : (
-                  <div style={{ padding: '16px', backgroundColor: '#f5f5f5', border: '1px dashed #d9d9d9', borderRadius: '2px', textAlign: 'center' }}>
-                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>No applicable pricing rules</div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>
-                      There are no pricing rules applicable for the selected room and dates. 
-                      Check that the rules' date ranges include your booking dates.
+                  <div
+                    style={{
+                      padding: "16px",
+                      backgroundColor: "#f5f5f5",
+                      border: "1px dashed #d9d9d9",
+                      borderRadius: "2px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ marginBottom: "8px", fontWeight: "bold" }}>
+                      No applicable pricing rules
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#888" }}>
+                      There are no pricing rules applicable for the selected
+                      room and dates. Check that the rules' date ranges include
+                      your booking dates.
                     </div>
                   </div>
                 )}
-                <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                <div style={{ marginTop: 8, color: "#888", fontSize: 12 }}>
                   Rules are applied from top to bottom.
                 </div>
               </div>
             )}
           </div>
         </div>
-        
-        <Form.Item
-          name="notes"
-          label="Notes"
-        >
-          <Input.TextArea 
+
+        <Form.Item name="notes" label="Notes">
+          <Input.TextArea
             rows={4}
             placeholder="Enter any additional notes about this booking"
           />
         </Form.Item>
-        
-        {drawerType === 'edit' && (
+
+        {drawerType === "edit" && (
           <Form.Item
             name="status"
             label="Status"
-            rules={[{ required: true, message: 'Please select status' }]}
+            rules={[{ required: true, message: "Please select status" }]}
           >
             <Select>
               <Option value="active">Active</Option>
@@ -1081,12 +1257,12 @@ export default function BookingsPage() {
   const resetPriceDisplay = () => {
     setPriceDisplay({
       basePrice: 0,
-      finalPrice: 0, 
+      finalPrice: 0,
       nights: 0,
       totalPrice: 0,
       hasDiscount: false,
       hasPremium: false,
-      percentageChange: 0
+      percentageChange: 0,
     });
     setSelectedTotalPrice(0);
     setSelectedPriceInfo(null);
@@ -1095,7 +1271,7 @@ export default function BookingsPage() {
   if (isInitializing) {
     return (
       <AppLayout>
-        <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        <div style={{ textAlign: "center", padding: "100px 0" }}>
           <Spin size="large" />
           <p style={{ marginTop: 16 }}>Initializing Google Sheets API...</p>
         </div>
@@ -1106,40 +1282,41 @@ export default function BookingsPage() {
   if (error) {
     return (
       <AppLayout>
-        <Alert 
-          message="Error" 
-          description={error} 
-          type="error" 
-          showIcon 
-        />
+        <Alert message="Error" description={error} type="error" showIcon />
       </AppLayout>
     );
   }
 
   return (
     <AppLayout>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <h1>Bookings</h1>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={() => handleShowDrawer('new')}
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleShowDrawer("new")}
         >
           New Booking
         </Button>
       </div>
-      
+
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={[
           {
-            key: 'active',
-            label: 'Active Bookings',
+            key: "active",
+            label: "Active Bookings",
             children: (
-              <Table 
-                columns={columns} 
-                dataSource={bookings.filter(b => b.status === 'active')} 
+              <Table
+                columns={columns}
+                dataSource={bookings.filter((b) => b.status === "active")}
                 rowKey="id"
                 loading={loading}
                 pagination={{ pageSize: 10 }}
@@ -1147,12 +1324,12 @@ export default function BookingsPage() {
             ),
           },
           {
-            key: 'checked-out',
-            label: 'Checked-out',
+            key: "checked-out",
+            label: "Checked-out",
             children: (
-              <Table 
-                columns={columns} 
-                dataSource={bookings.filter(b => b.status === 'checked-out')} 
+              <Table
+                columns={columns}
+                dataSource={bookings.filter((b) => b.status === "checked-out")}
                 rowKey="id"
                 loading={loading}
                 pagination={{ pageSize: 10 }}
@@ -1160,12 +1337,12 @@ export default function BookingsPage() {
             ),
           },
           {
-            key: 'cancelled',
-            label: 'Cancelled',
+            key: "cancelled",
+            label: "Cancelled",
             children: (
-              <Table 
-                columns={columns} 
-                dataSource={bookings.filter(b => b.status === 'cancelled')} 
+              <Table
+                columns={columns}
+                dataSource={bookings.filter((b) => b.status === "cancelled")}
                 rowKey="id"
                 loading={loading}
                 pagination={{ pageSize: 10 }}
@@ -1173,12 +1350,12 @@ export default function BookingsPage() {
             ),
           },
           {
-            key: 'all',
-            label: 'All Bookings',
+            key: "all",
+            label: "All Bookings",
             children: (
-              <Table 
-                columns={columns} 
-                dataSource={bookings} 
+              <Table
+                columns={columns}
+                dataSource={bookings}
                 rowKey="id"
                 loading={loading}
                 pagination={{ pageSize: 10 }}
@@ -1187,7 +1364,7 @@ export default function BookingsPage() {
           },
         ]}
       />
-      
+
       <Drawer
         title={drawerTitle}
         placement="right"
@@ -1196,20 +1373,18 @@ export default function BookingsPage() {
         open={drawerVisible}
         width={480}
         footer={
-          drawerType !== 'view' ? (
-            <div style={{ textAlign: 'right' }}>
+          drawerType !== "view" ? (
+            <div style={{ textAlign: "right" }}>
               <Button onClick={handleCloseDrawer} style={{ marginRight: 8 }}>
                 Cancel
               </Button>
               <Button onClick={handleSubmit} type="primary">
-                {drawerType === 'edit' ? 'Update' : 'Create'}
+                {drawerType === "edit" ? "Update" : "Create"}
               </Button>
             </div>
           ) : (
-            <div style={{ textAlign: 'right' }}>
-              <Button onClick={handleCloseDrawer}>
-                Close
-              </Button>
+            <div style={{ textAlign: "right" }}>
+              <Button onClick={handleCloseDrawer}>Close</Button>
             </div>
           )
         }
@@ -1218,4 +1393,4 @@ export default function BookingsPage() {
       </Drawer>
     </AppLayout>
   );
-} 
+}

@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Layout, Menu, Button, theme, Spin } from 'antd';
-import { 
-  HomeOutlined, 
-  BankOutlined, 
-  CalendarOutlined, 
-  BookOutlined, 
+import { useState, useEffect } from "react";
+import { Layout, Menu, Button, theme, Spin } from "antd";
+import {
+  HomeOutlined,
+  BankOutlined,
+  CalendarOutlined,
+  BookOutlined,
   BarChartOutlined,
   LogoutOutlined,
-  DollarOutlined
-} from '@ant-design/icons';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { isAuthenticated, clearToken } from '@/utils/auth';
+  DollarOutlined,
+} from "@ant-design/icons";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { isAuthenticated, clearToken } from "@/utils/auth";
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -27,12 +27,12 @@ function getItem(label, key, icon, children) {
 }
 
 const items = [
-  getItem('Dashboard', '/dashboard', <HomeOutlined />),
-  getItem('Rooms', '/rooms', <BankOutlined />),
-  getItem('Availability', '/availability', <CalendarOutlined />),
-  getItem('Bookings', '/bookings', <BookOutlined />),
-  getItem('Pricing', '/pricing', <DollarOutlined />),
-  getItem('Reports', '/reports', <BarChartOutlined />),
+  getItem("Dashboard", "/dashboard", <HomeOutlined />),
+  getItem("Rooms", "/rooms", <BankOutlined />),
+  getItem("Availability", "/availability", <CalendarOutlined />),
+  getItem("Bookings", "/bookings", <BookOutlined />),
+  getItem("Pricing Rules", "/pricingrules", <DollarOutlined />),
+  getItem("Reports", "/reports", <BarChartOutlined />),
 ];
 
 export default function AppLayout({ children }) {
@@ -48,72 +48,79 @@ export default function AppLayout({ children }) {
   useEffect(() => {
     // Check if user is authenticated
     if (!isAuthenticated()) {
-      router.push('/login');
+      router.push("/login");
     } else {
       setLoading(false);
     }
-    
-    const matchingKey = items.find(item => pathname.startsWith(item.key))?.key || '/dashboard';
+
+    const matchingKey =
+      items.find((item) => pathname.startsWith(item.key))?.key || "/dashboard";
     setSelectedKeys([matchingKey]);
   }, [pathname, router]);
 
   const handleLogout = () => {
     clearToken();
-    router.push('/login');
+    router.push("/login");
   };
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
-      }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <Spin size="large" tip="Loading..." />
       </div>
     );
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={(value) => setCollapsed(value)}>
+    <Layout style={{ minHeight: "100vh" }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={(value) => setCollapsed(value)}
+      >
         <div className="logo">HMS</div>
-        <Menu 
-          theme="dark" 
-          mode="inline" 
+        <Menu
+          theme="dark"
+          mode="inline"
           selectedKeys={selectedKeys}
-          items={items} 
+          items={items}
         />
       </Sider>
       <Layout>
         <Header style={{ padding: 0, background: colorBgContainer }}>
-          <Button 
-            type="text" 
-            icon={<LogoutOutlined />} 
+          <Button
+            type="text"
+            icon={<LogoutOutlined />}
             onClick={handleLogout}
-            style={{ float: 'right', margin: '16px 24px' }}
+            style={{ float: "right", margin: "16px 24px" }}
           >
             Logout
           </Button>
         </Header>
-        <Content style={{ margin: '0 16px' }}>
-          <div 
-            style={{ 
-              padding: 24, 
+        <Content style={{ margin: "0 16px" }}>
+          <div
+            style={{
+              padding: 24,
               minHeight: 360,
               background: colorBgContainer,
               borderRadius: borderRadiusLG,
-              margin: '16px 0'
+              margin: "16px 0",
             }}
           >
             {children}
           </div>
         </Content>
-        <Footer style={{ textAlign: 'center' }}>
+        <Footer style={{ textAlign: "center" }}>
           Hotel Management System ©{new Date().getFullYear()}
         </Footer>
       </Layout>
     </Layout>
   );
-} 
+}
