@@ -173,37 +173,33 @@ export default function ReportsPage() {
   const handleDownloadCSV = () => {
     if (!reportData) return;
 
-    // Create CSV content
-    let csvContent = "data:text/csv;charset=utf-8,";
+    // Build CSV string
+    let csv = "data:text/csv;charset=utf-8,";
 
-    // Add header row
-    csvContent += "Date,Occupancy Rate (%),Revenue ($)\n";
+    // Headers
+    csv += "Date,Occupancy %,Revenue\n";
 
-    // Add data rows
-    reportData.dailyOccupancy.forEach((item) => {
-      csvContent += `${item.date},${item.occupancy.toFixed(1)},${
-        item.revenue
-      }\n`;
+    // Add each row of data
+    reportData.dailyOccupancy.forEach((day) => {
+      csv += `${day.date},${day.occupancy.toFixed(1)},${day.revenue}\n`;
     });
 
-    // Add summary data
-    csvContent += "\nSummary Data\n";
-    csvContent += `Total Rooms,${reportData.totalRooms}\n`;
-    csvContent += `Occupied Rooms,${reportData.occupiedRooms}\n`;
-    csvContent += `Empty Rooms,${reportData.emptyRooms}\n`;
-    csvContent += `Out of Service Rooms,${reportData.outOfServiceRooms}\n`;
-    csvContent += `Overall Occupancy Rate,${reportData.occupancyRate.toFixed(
-      1
-    )}%\n`;
+    // Add a summary section
+    csv += "\nSummary\n";
+    csv += `Rooms Total,${reportData.totalRooms}\n`;
+    csv += `Rooms Occupied,${reportData.occupiedRooms}\n`;
+    csv += `Rooms Empty,${reportData.emptyRooms}\n`;
+    csv += `Rooms Out of Service,${reportData.outOfServiceRooms}\n`;
+    csv += `Overall Occupancy,${reportData.occupancyRate.toFixed(1)}%\n`;
 
-    // Create file name based on report type
-    const fileName = `${reportData.reportType}_report_${reportData.reportDate}.csv`;
+    // Create filename
+    const filename = `occupancy-${reportData.reportType}-${reportData.reportDate}.csv`;
 
-    // Create a download link and trigger download
-    const encodedUri = encodeURI(csvContent);
+    // Trigger download
+    const encodedUri = encodeURI(csv);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", fileName);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -212,65 +208,65 @@ export default function ReportsPage() {
   const handleDownloadPDF = () => {
     if (!reportData) return;
 
-    // Create new PDF document
+    // New PDF doc
     const doc = new jsPDF();
 
-    // Add title
-    const title = `${
-      reportData.reportType.charAt(0).toUpperCase() +
-      reportData.reportType.slice(1)
-    } Occupancy Report`;
+    // Title and date
+    const reportTitle = `${reportData.reportType[0].toUpperCase()}${reportData.reportType.slice(
+      1
+    )} Report`;
     doc.setFontSize(18);
-    doc.text(title, 14, 20);
-    doc.setFontSize(12);
-    doc.text(`Report Date: ${reportData.reportDate}`, 14, 30);
+    doc.text(reportTitle, 14, 22);
 
-    // Add summary statistics
+    doc.setFontSize(11);
+    doc.text(`Generated: ${reportData.reportDate}`, 14, 32);
+
+    // Summary section
     doc.setFontSize(14);
-    doc.text("Summary", 14, 40);
+    doc.text("Room Summary", 14, 45);
 
-    const summaryData = [
-      ["Total Rooms", reportData.totalRooms],
-      ["Occupied Rooms", reportData.occupiedRooms],
-      ["Empty Rooms", reportData.emptyRooms],
-      ["Out of Service Rooms", reportData.outOfServiceRooms],
-      ["Occupancy Rate", `${reportData.occupancyRate.toFixed(1)}%`],
+    // Create summary table data
+    const summaryRows = [
+      ["Total Rooms:", reportData.totalRooms],
+      ["Occupied:", reportData.occupiedRooms],
+      ["Empty:", reportData.emptyRooms],
+      ["Out of Service:", reportData.outOfServiceRooms],
+      ["Occupancy:", `${reportData.occupancyRate.toFixed(1)}%`],
     ];
 
-    // First table - Summary
+    // Draw the summary table
     autoTable(doc, {
-      startY: 45,
+      startY: 50,
       head: [["Metric", "Value"]],
-      body: summaryData,
+      body: summaryRows,
       theme: "grid",
-      headStyles: { fillColor: [66, 139, 202] },
+      headStyles: { fillColor: [41, 128, 185] },
     });
 
-    // Get final Y position after the first table
-    const finalY = (doc.lastAutoTable || {}).finalY || 45;
+    // Get the Y position after the table
+    const yPos = doc.lastAutoTable.finalY + 15;
 
-    // Add occupancy data table title
-    doc.setFontSize(14);
-    doc.text("Occupancy Data", 14, finalY + 10);
+    // Daily data section
+    doc.text("Daily Breakdown", 14, yPos);
 
-    const tableData = reportData.dailyOccupancy.map((item) => [
-      item.date,
-      `${item.occupancy.toFixed(1)}%`,
-      `$${item.revenue.toLocaleString()}`,
+    // Format the occupancy data for the table
+    const dailyData = reportData.dailyOccupancy.map((d) => [
+      d.date,
+      `${d.occupancy.toFixed(1)}%`,
+      `$${d.revenue}`,
     ]);
 
-    // Second table - Occupancy data
+    // Draw the occupancy table
     autoTable(doc, {
-      startY: finalY + 15,
-      head: [["Date", "Occupancy Rate", "Revenue"]],
-      body: tableData,
+      startY: yPos + 5,
+      head: [["Date", "Occupancy", "Revenue"]],
+      body: dailyData,
       theme: "grid",
-      headStyles: { fillColor: [66, 139, 202] },
+      headStyles: { fillColor: [41, 128, 185] },
     });
 
-    // Save PDF with filename
-    const fileName = `${reportData.reportType}_report_${reportData.reportDate}.pdf`;
-    doc.save(fileName);
+    // Save the PDF
+    doc.save(`hotel-report-${reportData.reportDate}.pdf`);
   };
 
   const renderDatePicker = () => {

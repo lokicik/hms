@@ -227,110 +227,120 @@ export default function BookingsPage() {
   };
 
   const handleDateRangeChange = async (dates) => {
-    // For empty or incomplete date selection, reset everything
     if (!dates || dates.length !== 2) {
-      setAvailableRooms([]);
-      resetPriceDisplay();
-
-      // Reset room selection
-      form.setFieldsValue({ roomId: undefined });
       return;
     }
 
-    const [checkIn, checkOut] = dates;
-    const guestCount = form.getFieldValue("guestCount") || 1;
-
     try {
-      // Reset room selection first before fetching new data
-      form.setFieldsValue({ roomId: undefined });
+      const [checkIn, checkOut] = dates;
+      const checkInDate = checkIn.format("YYYY-MM-DD");
+      const checkOutDate = checkOut.format("YYYY-MM-DD");
 
-      // Always reset price display when dates change
-      setPriceDisplay({
-        basePrice: 0,
-        finalPrice: 0,
-        nights: 0,
-        totalPrice: 0,
-        hasDiscount: false,
-        hasPremium: false,
-        percentageChange: 0,
-      });
+      // Disable the room selection until we get the available rooms
+      form.resetFields(["roomId"]);
 
-      // Show loading state
-      setLoading(true);
+      // Reset price info when dates change
+      resetPriceDisplay();
 
-      // Fetch price rules that might apply to this period
-      await fetchPriceRules();
+      // Check if we have guest count selected
+      const guestCount = form.getFieldValue("guestCount") || 1;
 
-      // Pass empty array for selectedRuleIds to let the server apply all applicable rules
+      // Get available rooms for the selected date range
       const availableRoomsData = await getAvailableRooms(
-        checkIn.format("YYYY-MM-DD"),
-        checkOut.format("YYYY-MM-DD"),
+        checkInDate,
+        checkOutDate,
         guestCount,
-        []
+        manualPriceRules ? targetSelectedRules : []
       );
 
       setAvailableRooms(availableRoomsData);
 
-      // If in manual mode, update the available rules based on the new dates
+      // If we're in manual rule selection mode, also fetch any applicable rules
       if (manualPriceRules) {
-        const roomId = form.getFieldValue("roomId");
-        if (roomId) {
-          const startDate = checkIn.format("YYYY-MM-DD");
-          const endDate = checkOut.format("YYYY-MM-DD");
+        const fetchApplicableRules = async () => {
+          try {
+            // Get prices data
+            const prices = await getPricesData();
 
-          // Get rules for the new date range and selected room
-          const allRules = await getPricesData();
-          const applicableRules = allRules.filter(
-            (rule) =>
-              (rule.roomId === roomId || rule.roomId === "all") &&
-              datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
-          );
-
-          // Format applicable rules for the transfer component
-          const formattedRules = applicableRules.map((rule) => ({
-            key: rule.id,
-            title: rule.name || `Rule ${rule.id}`,
-            description:
-              formatRuleDescription(rule) +
-              ` (${rule.startDate} to ${rule.endDate})`,
-            rule,
-          }));
-
-          console.log(
-            "Updated applicable rules for date change:",
-            formattedRules
-          );
-          setAvailableRules(formattedRules);
-
-          // Clear selected rules that are no longer applicable
-          const newApplicableRuleIds = formattedRules.map((r) => r.key);
-          const validSelectedRules = targetSelectedRules.filter((id) =>
-            newApplicableRuleIds.includes(id)
-          );
-
-          if (validSelectedRules.length !== targetSelectedRules.length) {
-            message.info(
-              "Some selected pricing rules are no longer applicable for the new date range"
+            // Filter for rules that might be applicable
+            const applicableRules = prices.filter(
+              (p) =>
+                (p.roomId === "all" ||
+                  p.roomId === form.getFieldValue("roomId")) &&
+                datesOverlap(p.startDate, p.endDate, checkInDate, checkOutDate)
             );
-            setTargetSelectedRules(validSelectedRules);
+
+            const formattedRules = applicableRules.map((rule) => ({
+              key: rule.id,
+              title: `${rule.name}: ${formatRuleDescription(rule)}`,
+              description: `${rule.startDate} to ${rule.endDate}`,
+              rule: rule,
+            }));
+
+            setAvailableRules(formattedRules);
+
+            // If we have previously selected rules, recalculate price with the new dates
+            if (
+              targetSelectedRules.length > 0 &&
+              form.getFieldValue("roomId")
+            ) {
+              const selectedRoom = availableRoomsData.find(
+                (r) => r.id === form.getFieldValue("roomId")
+              );
+
+              if (selectedRoom) {
+                const basePrice = parseFloat(selectedRoom.basePrice) || 0;
+                const nights = parseInt(selectedRoom.nights) || 0;
+
+                // Get the full rule objects for selected IDs
+                const selectedRules = formattedRules
+                  .filter((rule) => targetSelectedRules.includes(rule.key))
+                  .map((item) => item.rule);
+
+                // Calculate with the new dates
+                const newPrice = calculatePriceWithRules(
+                  basePrice,
+                  selectedRules,
+                  targetSelectedRules,
+                  checkIn.toDate(),
+                  checkOut.toDate()
+                );
+
+                // Update price display
+                updatePriceDisplay(basePrice, newPrice, nights);
+
+                // Update total price
+                const totalPrice = newPrice * nights;
+                setSelectedTotalPrice(totalPrice);
+
+                // Update selected price info
+                setSelectedPriceInfo({
+                  basePrice,
+                  appliedPrice: newPrice,
+                  isPriceRuleApplied: basePrice !== newPrice,
+                  nights,
+                  totalPrice,
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching pricing rules:", error);
           }
-        }
+        };
+
+        fetchApplicableRules();
       }
 
-      // Reset the price info when dates change
-      setSelectedTotalPrice(0);
-      setSelectedPriceInfo(null);
-      setTargetSelectedRules([]);
-
-      // If there's only one room available, auto-select it
-      if (availableRoomsData.length === 1) {
-        form.setFieldsValue({ roomId: availableRoomsData[0].id });
-        handleRoomSelect(availableRoomsData[0].id);
+      if (availableRoomsData.length === 0) {
+        message.warn("No rooms available for the selected dates");
+      } else {
+        message.success(
+          `${availableRoomsData.length} rooms available for the selected dates`
+        );
       }
     } catch (error) {
-      console.error("Error fetching available rooms:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error finding available rooms:", error);
+      message.error("Failed to find available rooms");
     }
   };
 
@@ -381,12 +391,22 @@ export default function BookingsPage() {
       const dateRange = form.getFieldValue("dateRange");
       const [checkIn, checkOut] = dateRange || [];
 
+      // Calculate the number of nights from the date range
+      let nights = 1; // Default to 1
+      if (checkIn && checkOut) {
+        // Calculate nights properly from the actual date range
+        const checkInDate = checkIn.toDate();
+        const checkOutDate = checkOut.toDate();
+        nights = Math.ceil(
+          (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
+        );
+      }
+
       // Immediately update price display with available data
       // This provides instant feedback while async operations complete
       const basePrice = parseFloat(room.basePrice) || 0;
       const pricePerNight = parseFloat(room.pricePerNight) || basePrice;
-      const nights = room.nights || 1;
-      const totalPrice = parseFloat(room.totalPrice) || pricePerNight * nights;
+      const totalPrice = pricePerNight * nights;
 
       // Update price display immediately
       updatePriceDisplay(basePrice, pricePerNight, nights);
@@ -540,9 +560,25 @@ export default function BookingsPage() {
     const selectedRoom = availableRooms.find(
       (r) => r.id === form.getFieldValue("roomId")
     );
+
+    // Get date range
+    const dateRange = form.getFieldValue("dateRange");
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      console.warn(
+        "Date range not selected, can't calculate rule-specific pricing"
+      );
+      return;
+    }
+
+    // Convert from dayjs to dates
+    const checkIn = dateRange[0].toDate();
+    const checkOut = dateRange[1].toDate();
+
+    // Calculate the correct number of nights
+    const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+
     if (selectedRoom) {
       const basePrice = parseFloat(selectedRoom.basePrice) || 0;
-      const nights = parseInt(selectedRoom.nights) || 5;
 
       // Get full rule objects for the selected IDs
       const selectedRules = availableRules
@@ -551,11 +587,13 @@ export default function BookingsPage() {
 
       console.log("Selected rule objects:", selectedRules);
 
-      // Calculate the new price with selected rules
+      // Calculate the new price with selected rules - now passing dates
       const newPrice = calculatePriceWithRules(
         basePrice,
         selectedRules,
-        targetKeys
+        targetKeys,
+        checkIn,
+        checkOut
       );
       console.log(`New calculated price: ${newPrice} (base: ${basePrice})`);
 
@@ -843,6 +881,7 @@ export default function BookingsPage() {
                           const roomWithPrice = availableRoomsData.find(
                             (r) => r.id === roomId
                           );
+
                           if (roomWithPrice) {
                             // Update total price
                             setSelectedTotalPrice(roomWithPrice.totalPrice);
@@ -853,20 +892,63 @@ export default function BookingsPage() {
                             const isPriceRuleApplied =
                               basePrice !== appliedPrice;
 
-                            setSelectedPriceInfo({
-                              basePrice,
-                              appliedPrice,
-                              isPriceRuleApplied,
-                              nights: roomWithPrice.nights,
-                              totalPrice: roomWithPrice.totalPrice,
-                            });
+                            // For manual rule selection mode, recalculate with current rules
+                            if (
+                              manualPriceRules &&
+                              targetSelectedRules.length > 0
+                            ) {
+                              // Get the selected rules
+                              const selectedRules = availableRules
+                                .filter((rule) =>
+                                  targetSelectedRules.includes(rule.key)
+                                )
+                                .map((item) => item.rule);
 
-                            // Update the price display
-                            updatePriceDisplay(
-                              basePrice,
-                              appliedPrice,
-                              roomWithPrice.nights
-                            );
+                              // Recalculate with the dates
+                              const newPrice = calculatePriceWithRules(
+                                basePrice,
+                                selectedRules,
+                                targetSelectedRules,
+                                checkIn.toDate(),
+                                checkOut.toDate()
+                              );
+
+                              // Update price info
+                              setSelectedPriceInfo({
+                                basePrice,
+                                appliedPrice: newPrice,
+                                isPriceRuleApplied: basePrice !== newPrice,
+                                nights: roomWithPrice.nights,
+                                totalPrice: newPrice * roomWithPrice.nights,
+                              });
+
+                              // Update the price display
+                              updatePriceDisplay(
+                                basePrice,
+                                newPrice,
+                                roomWithPrice.nights
+                              );
+
+                              // Update total price
+                              setSelectedTotalPrice(
+                                newPrice * roomWithPrice.nights
+                              );
+                            } else {
+                              setSelectedPriceInfo({
+                                basePrice,
+                                appliedPrice,
+                                isPriceRuleApplied,
+                                nights: roomWithPrice.nights,
+                                totalPrice: roomWithPrice.totalPrice,
+                              });
+
+                              // Update the price display
+                              updatePriceDisplay(
+                                basePrice,
+                                appliedPrice,
+                                roomWithPrice.nights
+                              );
+                            }
 
                             message.info(
                               "Price updated based on selected dates"
