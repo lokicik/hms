@@ -425,10 +425,6 @@ export default function BookingsPage() {
               datesOverlap(rule.startDate, rule.endDate, startDate, endDate)
           );
 
-          console.log(
-            `Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`
-          );
-
           // Format applicable rules for the transfer component
           const formattedRules = applicableRules.map((rule) => ({
             key: rule.id,
@@ -439,7 +435,6 @@ export default function BookingsPage() {
             rule,
           }));
 
-          console.log("Applicable rules for this room:", formattedRules);
           setAvailableRules(formattedRules);
 
           // If in manual mode, check if any previously selected rules are no longer applicable
@@ -478,10 +473,6 @@ export default function BookingsPage() {
         nights: nights,
         totalPrice: totalPrice,
       });
-
-      console.log(
-        `Selected room with price: ${totalPrice}, basePrice: ${basePrice}, pricePerNight: ${pricePerNight}, nights: ${nights}`
-      );
     }
   };
 
@@ -511,7 +502,6 @@ export default function BookingsPage() {
         disabled: false, // Make sure rules aren't disabled by default
       }));
 
-      console.log("Available price rules:", formattedRules);
       setAvailableRules(formattedRules);
     } catch (error) {
       console.error("Error fetching price rules:", error);
@@ -537,10 +527,6 @@ export default function BookingsPage() {
     const difference = finalPrice - basePrice;
     const percentageChange = basePrice > 0 ? (difference / basePrice) * 100 : 0;
 
-    console.log(
-      `Updating price display: basePrice=${basePrice}, finalPrice=${finalPrice}, nights=${nights}, totalPrice=${totalPrice}`
-    );
-
     setPriceDisplay({
       basePrice,
       finalPrice,
@@ -553,7 +539,6 @@ export default function BookingsPage() {
   };
 
   const handleRuleSelectionChange = (targetKeys) => {
-    console.log("Selected rules changed:", targetKeys);
     setTargetSelectedRules(targetKeys);
 
     // Recalculate price based on selected rules
@@ -564,9 +549,6 @@ export default function BookingsPage() {
     // Get date range
     const dateRange = form.getFieldValue("dateRange");
     if (!dateRange || !dateRange[0] || !dateRange[1]) {
-      console.warn(
-        "Date range not selected, can't calculate rule-specific pricing"
-      );
       return;
     }
 
@@ -585,8 +567,6 @@ export default function BookingsPage() {
         .filter((rule) => targetKeys.includes(rule.key))
         .map((item) => item.rule);
 
-      console.log("Selected rule objects:", selectedRules);
-
       // Calculate the new price with selected rules - now passing dates
       const newPrice = calculatePriceWithRules(
         basePrice,
@@ -595,7 +575,6 @@ export default function BookingsPage() {
         checkIn,
         checkOut
       );
-      console.log(`New calculated price: ${newPrice} (base: ${basePrice})`);
 
       // Update the price display
       updatePriceDisplay(basePrice, newPrice, nights);
@@ -1168,7 +1147,6 @@ export default function BookingsPage() {
               <Switch
                 checked={manualPriceRules}
                 onChange={(checked) => {
-                  console.log("Manual price rules toggled:", checked);
                   setManualPriceRules(checked);
 
                   // Reset selected rules
@@ -1210,10 +1188,6 @@ export default function BookingsPage() {
                               )
                           );
 
-                          console.log(
-                            `Found ${applicableRules.length} applicable rules for dates ${startDate} to ${endDate}`
-                          );
-
                           // Format applicable rules for the transfer component
                           const formattedRules = applicableRules.map(
                             (rule) => ({
@@ -1226,10 +1200,6 @@ export default function BookingsPage() {
                             })
                           );
 
-                          console.log(
-                            "Applicable rules for manual selection:",
-                            formattedRules
-                          );
                           setAvailableRules(formattedRules);
                         } catch (error) {
                           console.error(
