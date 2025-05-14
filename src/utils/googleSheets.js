@@ -585,40 +585,49 @@ export async function addBooking(booking) {
     const bookings = await getBookingsData();
     const nextId = Math.max(...bookings.map((b) => parseInt(b.id) || 0), 0) + 1;
 
-    // Get rooms and pricing rules
-    const prices = await getPricesData();
+    // Get rooms data
     const rooms = await getRoomsData();
     const room = rooms.find((r) => r.id === booking.roomId);
 
-    // Get the base price from the room
-    const basePrice = room ? parseFloat(room.basePrice) : 0;
+    // Use provided price information if available, otherwise calculate it
+    let basePrice = booking.basePrice;
+    let pricePerNight = booking.pricePerNight;
+    let nights = booking.nights;
+    let totalPrice = booking.totalPrice;
+    
+    // If price information is not provided, calculate it
+    if (!basePrice || !pricePerNight || !nights || !totalPrice) {
+      // Get the base price from the room
+      basePrice = room ? parseFloat(room.basePrice) : 0;
+      
+      // Find applicable pricing rules for this room and date range
+      const prices = await getPricesData();
+      const applicableRules = prices.filter(
+        (p) =>
+          (p.roomId === booking.roomId || p.roomId === "all") &&
+          datesOverlap(p.startDate, p.endDate, booking.checkIn, booking.checkOut)
+      );
 
-    // Find applicable pricing rules for this room and date range
-    const applicableRules = prices.filter(
-      (p) =>
-        (p.roomId === booking.roomId || p.roomId === "all") &&
-        datesOverlap(p.startDate, p.endDate, booking.checkIn, booking.checkOut)
-    );
+      // Get selected rule IDs from the booking if available
+      const selectedRuleIds = booking.selectedRuleIds || [];
 
-    // Get selected rule IDs from the booking if available
-    const selectedRuleIds = booking.selectedRuleIds || [];
+      // Calculate price per night using rules
+      pricePerNight = calculatePriceWithRules(
+        basePrice,
+        applicableRules,
+        selectedRuleIds,
+        booking.checkIn,
+        booking.checkOut
+      );
 
-    // Calculate price per night using rules
-    const pricePerNight = calculatePriceWithRules(
-      basePrice,
-      applicableRules,
-      selectedRuleIds,
-      booking.checkIn,
-      booking.checkOut
-    );
+      // Calculate number of nights
+      const checkIn = new Date(booking.checkIn);
+      const checkOut = new Date(booking.checkOut);
+      nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
-    // Calculate number of nights
-    const checkIn = new Date(booking.checkIn);
-    const checkOut = new Date(booking.checkOut);
-    const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-
-    // Calculate total price
-    const totalPrice = pricePerNight * nights;
+      // Calculate total price
+      totalPrice = pricePerNight * nights;
+    }
 
     // Expand spreadsheet headers if needed
     try {
@@ -701,7 +710,7 @@ export async function addBooking(booking) {
         basePrice.toString(),
         pricePerNight.toString(),
         nights.toString(),
-        selectedRuleIds.join(","),
+        booking.selectedRuleIds ? booking.selectedRuleIds.join(",") : "",
         booking.notes || "",
       ],
     ];
@@ -725,7 +734,7 @@ export async function addBooking(booking) {
       basePrice,
       pricePerNight,
       nights,
-      selectedRuleIds,
+      selectedRuleIds: booking.selectedRuleIds,
     };
   } catch (error) {
     console.error("Error adding booking:", error);
@@ -755,41 +764,44 @@ export async function updateBooking(bookingId, booking) {
     // +2 because the first row is headers and array is 0-indexed
     const row = rowIndex + 2;
 
-    // If dates or room changed, check for price rule
-    let basePrice = booking.basePrice;
-    let pricePerNight = booking.pricePerNight;
-    let priceRuleApplied = booking.priceRuleApplied;
-    let priceRuleId = booking.priceRuleId;
-    let totalPrice = booking.totalPrice;
-
-    // If a key booking parameter changed, recalculate prices
+    // Use provided price information if available
+    let basePrice = booking.basePrice !== undefined ? booking.basePrice : 0;
+    let pricePerNight = booking.pricePerNight !== undefined ? booking.pricePerNight : 0;
+    let totalPrice = booking.totalPrice !== undefined ? booking.totalPrice : 0;
+    
+    // If key booking parameters changed and price info not explicitly provided, recalculate prices
     if (
-      booking.checkIn !== bookings[rowIndex].checkIn ||
+      (booking.checkIn !== bookings[rowIndex].checkIn ||
       booking.checkOut !== bookings[rowIndex].checkOut ||
-      booking.roomId !== bookings[rowIndex].roomId
+      booking.roomId !== bookings[rowIndex].roomId) &&
+      (booking.basePrice === undefined || booking.pricePerNight === undefined || booking.totalPrice === undefined)
     ) {
       // Check if any pricing rule applies to this booking
       const prices = await getPricesData();
       const rooms = await getRoomsData();
       const room = rooms.find((r) => r.id === booking.roomId);
 
-      // Get the base price from the room
+      // Get base price from room
       basePrice = room ? parseFloat(room.basePrice) : 0;
 
-      // Find any applicable pricing rule
-      const priceRule = prices.find(
+      // Find applicable pricing rules for this room and date range
+      const applicableRules = prices.filter(
         (p) =>
           (p.roomId === booking.roomId || p.roomId === "all") &&
-          datesOverlap(
-            p.startDate,
-            p.endDate,
-            booking.checkIn,
-            booking.checkOut
-          )
+          datesOverlap(p.startDate, p.endDate, booking.checkIn, booking.checkOut)
       );
 
-      // Calculate price per night (either from rule or base price)
-      pricePerNight = priceRule ? parseFloat(priceRule.price) : basePrice;
+      // Get selected rule IDs from the booking if available
+      const selectedRuleIds = booking.selectedRuleIds || [];
+
+      // Calculate price per night using rules
+      pricePerNight = calculatePriceWithRules(
+        basePrice,
+        applicableRules,
+        selectedRuleIds,
+        booking.checkIn,
+        booking.checkOut
+      );
 
       // Calculate number of nights
       const checkIn = new Date(booking.checkIn);
@@ -798,15 +810,23 @@ export async function updateBooking(bookingId, booking) {
 
       // Calculate total price
       totalPrice = pricePerNight * nights;
-
-      // Store whether a pricing rule was applied and its ID if applicable
-      priceRuleApplied = priceRule ? true : false;
-      priceRuleId = priceRule ? priceRule.id : "";
     }
+
+    // If we have selectedRuleIds, format them correctly
+    const priceRuleId = booking.selectedRuleIds 
+      ? (Array.isArray(booking.selectedRuleIds) 
+          ? booking.selectedRuleIds.join(",") 
+          : booking.selectedRuleIds)
+      : "";
+
+    // For backward compatibility
+    const priceRuleApplied = booking.priceRuleApplied !== undefined 
+      ? booking.priceRuleApplied 
+      : basePrice !== pricePerNight;
 
     const values = [
       [
-        bookingId,
+        booking.id || bookingId,
         booking.roomId,
         booking.guestName,
         booking.phone,

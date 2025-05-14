@@ -170,11 +170,16 @@ export default function BookingsPage() {
       const values = await form.validateFields();
       const [checkIn, checkOut] = values.dateRange;
 
+      // Use the calculated value from the display rather than recalculating it
       const bookingData = {
         ...values,
         checkIn: checkIn.format("YYYY-MM-DD"),
         checkOut: checkOut.format("YYYY-MM-DD"),
-        totalPrice: selectedTotalPrice,
+        // Use the price that's shown in the UI
+        totalPrice: priceDisplay.totalPrice,
+        basePrice: priceDisplay.basePrice,
+        pricePerNight: priceDisplay.finalPrice,
+        nights: priceDisplay.nights,
         selectedRuleIds: manualPriceRules ? targetSelectedRules : [],
         notes: values.notes || "",
       };
@@ -216,7 +221,16 @@ export default function BookingsPage() {
     try {
       const booking = bookings.find((b) => b.id === id);
       if (booking) {
-        await updateBooking(id, { ...booking, status: "cancelled" });
+        // Ensure all required price information is included
+        const bookingToUpdate = {
+          ...booking,
+          status: "cancelled",
+          basePrice: booking.basePrice || 0,
+          pricePerNight: booking.pricePerNight || 0,
+          totalPrice: booking.totalPrice || 0,
+          priceRuleApplied: booking.priceRuleApplied || false
+        };
+        await updateBooking(id, bookingToUpdate);
         message.success("Booking cancelled successfully");
         fetchData();
       }
@@ -979,10 +993,6 @@ export default function BookingsPage() {
               // Make sure we have numeric values for display
               const basePrice = parseFloat(room.basePrice) || 0;
               const pricePerNight = parseFloat(room.pricePerNight) || basePrice;
-              const nights = room.nights || 5; // Default to 5 nights if not available
-              const totalPrice =
-                parseFloat(room.totalPrice) || pricePerNight * nights;
-
               const isSpecialPrice = pricePerNight !== basePrice;
 
               return (
@@ -1014,7 +1024,6 @@ export default function BookingsPage() {
                   ) : (
                     <span>${pricePerNight}/night</span>
                   )}
-                  - Total: ${totalPrice}
                 </Option>
               );
             })}
