@@ -173,18 +173,14 @@ export default function ReportsPage() {
   const handleDownloadCSV = () => {
     if (!reportData) return;
 
-    // Build CSV string
     let csv = "data:text/csv;charset=utf-8,";
 
-    // Headers
     csv += "Date,Occupancy %,Revenue\n";
 
-    // Add each row of data
     reportData.dailyOccupancy.forEach((day) => {
       csv += `${day.date},${day.occupancy.toFixed(1)},${day.revenue}\n`;
     });
 
-    // Add a summary section
     csv += "\nSummary\n";
     csv += `Rooms Total,${reportData.totalRooms}\n`;
     csv += `Rooms Occupied,${reportData.occupiedRooms}\n`;
@@ -192,10 +188,8 @@ export default function ReportsPage() {
     csv += `Rooms Out of Service,${reportData.outOfServiceRooms}\n`;
     csv += `Overall Occupancy,${reportData.occupancyRate.toFixed(1)}%\n`;
 
-    // Create filename
     const filename = `occupancy-${reportData.reportType}-${reportData.reportDate}.csv`;
 
-    // Trigger download
     const encodedUri = encodeURI(csv);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -208,10 +202,8 @@ export default function ReportsPage() {
   const handleDownloadPDF = () => {
     if (!reportData) return;
 
-    // New PDF doc
     const doc = new jsPDF();
 
-    // Title and date
     const reportTitle = `${reportData.reportType[0].toUpperCase()}${reportData.reportType.slice(
       1
     )} Report`;
@@ -221,11 +213,9 @@ export default function ReportsPage() {
     doc.setFontSize(11);
     doc.text(`Generated: ${reportData.reportDate}`, 14, 32);
 
-    // Summary section
     doc.setFontSize(14);
     doc.text("Room Summary", 14, 45);
 
-    // Create summary table data
     const summaryRows = [
       ["Total Rooms:", reportData.totalRooms],
       ["Occupied:", reportData.occupiedRooms],
@@ -234,7 +224,6 @@ export default function ReportsPage() {
       ["Occupancy:", `${reportData.occupancyRate.toFixed(1)}%`],
     ];
 
-    // Draw the summary table
     autoTable(doc, {
       startY: 50,
       head: [["Metric", "Value"]],
@@ -243,20 +232,16 @@ export default function ReportsPage() {
       headStyles: { fillColor: [41, 128, 185] },
     });
 
-    // Get the Y position after the table
     const yPos = doc.lastAutoTable.finalY + 15;
 
-    // Daily data section
     doc.text("Daily Breakdown", 14, yPos);
 
-    // Format the occupancy data for the table
     const dailyData = reportData.dailyOccupancy.map((d) => [
       d.date,
       `${d.occupancy.toFixed(1)}%`,
       `$${d.revenue}`,
     ]);
 
-    // Draw the occupancy table
     autoTable(doc, {
       startY: yPos + 5,
       head: [["Date", "Occupancy", "Revenue"]],
@@ -265,7 +250,6 @@ export default function ReportsPage() {
       headStyles: { fillColor: [41, 128, 185] },
     });
 
-    // Save the PDF
     doc.save(`hotel-report-${reportData.reportDate}.pdf`);
   };
 

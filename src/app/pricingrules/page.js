@@ -16,6 +16,7 @@ import {
   Tag,
   Space,
   Radio,
+  InputNumber,
 } from "antd";
 import {
   PlusOutlined,
@@ -61,7 +62,6 @@ export default function PricingPage() {
           getPricesData(),
         ]);
 
-        // Enrich price rules with room details
         const enhancedPriceRules = pricesData.map((rule) => {
           const room = roomsData.find((r) => r.id === rule.roomId) || {};
           return {
@@ -143,7 +143,6 @@ export default function PricingPage() {
         message.success("Price rule added successfully");
       }
 
-      // Update the rule in the state
       if (editingRule) {
         setPriceRules((prevRules) =>
           prevRules.map((rule) =>
@@ -198,97 +197,115 @@ export default function PricingPage() {
 
   const handleDelete = async (id) => {
     try {
-      setLoading(true);
       await deletePriceRule(id);
-      setPriceRules((prevRules) => prevRules.filter((rule) => rule.id !== id));
       message.success("Price rule deleted successfully");
+      setPriceRules((prevRules) => prevRules.filter((rule) => rule.id !== id));
     } catch (error) {
       console.error("Error deleting price rule:", error);
       message.error("Failed to delete price rule. Please try again.");
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handlePriceTypeChange = (e) => {
+    const type = e.target.value;
+    setCurrentPriceType(type);
+    form.setFieldsValue({
+      priceValue: "",
+    });
   };
 
   const columns = [
     {
-      title: "Rule Name",
+      title: "Name",
       dataIndex: "name",
       key: "name",
-      render: (name, record) => name || `Rule ${record.id}`,
+      sorter: (a, b) => (a.name || "").localeCompare(b.name || ""),
+      render: (text) => text || <span style={{ color: "#ccc" }}>Unnamed</span>,
     },
     {
       title: "Room",
       dataIndex: "roomNumber",
       key: "roomNumber",
-      render: (roomNumber, record) =>
-        record.roomId === "all" ? "All Rooms" : roomNumber,
-    },
-    {
-      title: "Room Type",
-      dataIndex: "roomType",
-      key: "roomType",
-      render: (type) => {
-        if (!type) return "";
-        let color = "blue";
-        if (type === "double") {
-          color = "purple";
-        } else if (type === "family") {
-          color = "green";
+      sorter: (a, b) => {
+        if (a.roomId === "all") return -1;
+        if (b.roomId === "all") return 1;
+        return a.roomNumber?.localeCompare(b.roomNumber);
+      },
+      render: (text, record) => {
+        if (record.roomId === "all") {
+          return <Tag color="blue">All Rooms</Tag>;
         }
-        return type ? <Tag color={color}>{type.toUpperCase()}</Tag> : "";
+        return (
+          <span>
+            Room {text}{" "}
+            {record.roomType && (
+              <Tag color="green">{record.roomType.toUpperCase()}</Tag>
+            )}
+          </span>
+        );
       },
       filters: [
-        { text: "All Rooms", value: "all" },
-        { text: "Single", value: "single" },
-        { text: "Double", value: "double" },
-        { text: "Family", value: "family" },
+        {
+          text: "All Rooms",
+          value: "all",
+        },
+        ...Array.from(
+          new Set(
+            rooms
+              .filter((room) => room.number)
+              .map((room) => room.number)
+              .sort()
+          )
+        ).map((num) => ({ text: `Room ${num}`, value: num })),
       ],
-      onFilter: (value, record) =>
-        record.roomId === "all" || record.roomType === value,
+      onFilter: (value, record) => {
+        if (value === "all") return record.roomId === "all";
+        return record.roomNumber === value;
+      },
     },
     {
-      title: "Start Date",
-      dataIndex: "startDate",
-      key: "startDate",
-      sorter: (a, b) => new Date(a.startDate) - new Date(b.startDate),
-    },
-    {
-      title: "End Date",
-      dataIndex: "endDate",
-      key: "endDate",
-      sorter: (a, b) => new Date(a.endDate) - new Date(b.endDate),
+      title: "Dates",
+      key: "dates",
+      render: (_, record) => (
+        <span>
+          {dayjs(record.startDate).format("MMM DD, YYYY")} -{" "}
+          {dayjs(record.endDate).format("MMM DD, YYYY")}
+        </span>
+      ),
+      sorter: (a, b) => {
+        if (!a.startDate || !b.startDate) return 0;
+        return dayjs(a.startDate).diff(dayjs(b.startDate));
+      },
     },
     {
       title: "Price Type",
       dataIndex: "priceType",
       key: "priceType",
-      render: (type) => (
-        <Tag color={type === "percentage" ? "blue" : "green"}>
-          {type === "percentage" ? "Percentage" : "Fixed Amount"}
+      render: (text) => (
+        <Tag color={text === "fixed" ? "purple" : "orange"}>
+          {text === "fixed" ? "Fixed Price" : "Percentage"}
         </Tag>
       ),
       filters: [
-        { text: "Fixed Amount", value: "fixed" },
+        { text: "Fixed Price", value: "fixed" },
         { text: "Percentage", value: "percentage" },
       ],
       onFilter: (value, record) => record.priceType === value,
     },
     {
-      title: "Price Value",
+      title: "Value",
       dataIndex: "priceValue",
       key: "priceValue",
       render: (value, record) => {
-        if (record.priceType === "percentage") {
-          const isIncrease = value > 0;
+        if (record.priceType === "fixed") {
+          return <span>${value}</span>;
+        } else {
           return (
-            <span style={{ color: isIncrease ? "#ff4d4f" : "#52c41a" }}>
-              {isIncrease ? "+" : ""}
+            <span>
+              {value > 0 ? "+" : ""}
               {value}%
             </span>
           );
-        } else {
-          return `$${value}`;
         }
       },
       sorter: (a, b) => a.priceValue - b.priceValue,
@@ -297,101 +314,97 @@ export default function PricingPage() {
       title: "Actions",
       key: "actions",
       render: (_, record) => (
-        <Space>
+        <Space size="small">
           <Button
             icon={<EditOutlined />}
             onClick={() => showEditModal(record)}
             size="small"
           />
           <Popconfirm
-            title="Are you sure you want to delete this price rule?"
+            title="Are you sure you want to delete this rule?"
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
+            placement="left"
           >
-            <Button danger icon={<DeleteOutlined />} size="small" />
+            <Button icon={<DeleteOutlined />} danger size="small" />
           </Popconfirm>
         </Space>
       ),
     },
   ];
 
+  if (loading) {
+    return (
+      <AppLayout>
+        <div style={{ textAlign: "center", padding: "100px 0" }}>
+          <Spin size="large" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
-      <h1>Pricing Rules Management</h1>
-
       <div
         style={{
-          marginBottom: 16,
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          marginBottom: 16,
         }}
       >
+        <h1>Pricing Rules</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
-          Add New Price Rule
+          Add Rule
         </Button>
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "50px 0" }}>
-          <Spin size="large" />
-        </div>
-      ) : (
-        <Card>
-          <Table
-            columns={columns}
-            dataSource={priceRules}
-            rowKey="id"
-            pagination={{ pageSize: 10 }}
-          />
-        </Card>
-      )}
+      <Card>
+        <Table
+          columns={columns}
+          dataSource={priceRules}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+        />
+      </Card>
 
       <Modal
         title={modalTitle}
         open={isModalVisible}
         onCancel={handleCancel}
-        footer={[
-          <Button key="back" onClick={handleCancel}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={modalLoading}
-            onClick={handleSubmit}
-          >
-            Save
-          </Button>,
-        ]}
+        confirmLoading={modalLoading}
+        onOk={handleSubmit}
+        width={600}
       >
         <Form form={form} layout="vertical">
           <Form.Item
             name="name"
             label="Rule Name"
-            rules={[{ required: true, message: "Please enter a rule name" }]}
+            rules={[
+              {
+                required: true,
+                message: "Please enter a name for the price rule",
+              },
+            ]}
           >
-            <Input placeholder="Enter a descriptive name (e.g. Summer Season, Weekend Discount)" />
+            <Input placeholder="e.g. Summer Season, Weekend, Holiday" />
           </Form.Item>
 
           <Form.Item
             name="roomId"
-            label="Apply to"
+            label="Apply to Room"
             rules={[
               {
                 required: true,
-                message: "Please select where to apply the rule",
+                message: "Please select which room(s) this rule applies to",
               },
             ]}
           >
-            <Select placeholder="Select room or all rooms">
-              <Option key="all" value="all">
-                All Rooms
-              </Option>
+            <Select placeholder="Select a room">
+              <Option value="all">All Rooms</Option>
               {rooms.map((room) => (
                 <Option key={room.id} value={room.id}>
-                  Room {room.number} - {room.type.toUpperCase()} (Base Price: $
-                  {room.basePrice})
+                  Room {room.number} ({room.type})
                 </Option>
               ))}
             </Select>
@@ -400,7 +413,12 @@ export default function PricingPage() {
           <Form.Item
             name="dateRange"
             label="Date Range"
-            rules={[{ required: true, message: "Please select date range" }]}
+            rules={[
+              {
+                required: true,
+                message: "Please select the date range for this rule",
+              },
+            ]}
           >
             <RangePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
           </Form.Item>
@@ -408,57 +426,93 @@ export default function PricingPage() {
           <Form.Item
             name="priceType"
             label="Price Type"
-            rules={[{ required: true, message: "Please select price type" }]}
+            rules={[
+              {
+                required: true,
+                message: "Please select the price type",
+              },
+            ]}
           >
-            <Radio.Group
-              onChange={(e) => {
-                setCurrentPriceType(e.target.value);
-                // Force form to update
-                form.setFieldsValue({
-                  ...form.getFieldsValue(),
-                  priceType: e.target.value,
-                });
-              }}
-            >
-              <Radio value="fixed">Fixed Amount</Radio>
+            <Radio.Group onChange={handlePriceTypeChange}>
+              <Radio value="fixed">Fixed Price</Radio>
               <Radio value="percentage">Percentage Adjustment</Radio>
             </Radio.Group>
           </Form.Item>
 
           <Form.Item
             name="priceValue"
-            label="Price Value"
+            label={
+              currentPriceType === "fixed"
+                ? "Fixed Price Amount"
+                : "Percentage Adjustment"
+            }
             rules={[
-              { required: true, message: "Please enter the price value" },
-              ({ getFieldValue }) => ({
+              {
+                required: true,
+                message: "Please enter the price value",
+              },
+              {
                 validator(_, value) {
-                  const priceType = getFieldValue("priceType");
-                  if (priceType === "fixed" && value <= 0) {
-                    return Promise.reject("Fixed price must be greater than 0");
+                  const numValue = parseFloat(value);
+                  if (isNaN(numValue)) {
+                    return Promise.reject(
+                      new Error("Please enter a valid number")
+                    );
                   }
-                  if (priceType === "percentage" && value === 0) {
-                    return Promise.reject("Percentage cannot be 0");
+                  if (currentPriceType === "fixed" && numValue <= 0) {
+                    return Promise.reject(
+                      new Error("Fixed price must be greater than 0")
+                    );
                   }
                   return Promise.resolve();
                 },
-              }),
+              },
             ]}
-            extra={
-              currentPriceType === "percentage"
-                ? "Use positive values for price increases (e.g. 10 for +10%) or negative values for discounts (e.g. -15 for -15%)"
-                : "Enter the exact price to charge per night"
-            }
           >
-            <Input
-              prefix={currentPriceType === "fixed" ? <DollarOutlined /> : null}
-              suffix={currentPriceType === "percentage" ? "%" : null}
-              placeholder={
-                currentPriceType === "fixed"
-                  ? "Enter fixed price"
-                  : "Enter percentage adjustment"
-              }
-            />
+            {currentPriceType === "fixed" ? (
+              <InputNumber
+                prefix="$"
+                min={0.01}
+                step={10}
+                style={{ width: "100%" }}
+                formatter={(value) =>
+                  `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                }
+                parser={(value) => value.replace(/\$\s?|(,*)/g, "")}
+                placeholder="e.g. 150"
+              />
+            ) : (
+              <InputNumber
+                prefix={null}
+                suffix="%"
+                min={-100}
+                max={100}
+                step={5}
+                style={{ width: "100%" }}
+                placeholder="e.g. 20 for +20%, -10 for discount"
+              />
+            )}
           </Form.Item>
+
+          <div style={{ marginTop: 16 }}>
+            <p>
+              <strong>How price rules work:</strong>
+            </p>
+            <ul style={{ paddingLeft: 20 }}>
+              <li>
+                <strong>Fixed Price:</strong> Overrides the room's base price
+                completely
+              </li>
+              <li>
+                <strong>Percentage Adjustment:</strong> Modifies the room's base
+                price by the percentage value
+              </li>
+              <li>
+                When multiple rules apply, they are processed in order of
+                selection
+              </li>
+            </ul>
+          </div>
         </Form>
       </Modal>
     </AppLayout>

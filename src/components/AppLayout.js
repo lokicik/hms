@@ -46,7 +46,6 @@ export default function AppLayout({ children }) {
   } = theme.useToken();
 
   useEffect(() => {
-    // Check if user is authenticated
     if (!isAuthenticated()) {
       router.push("/login");
     } else {
